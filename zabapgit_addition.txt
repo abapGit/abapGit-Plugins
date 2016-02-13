@@ -1,0 +1,152 @@
+... snip
+
+
+CLASS lcl_objects:
+
+  METHOD create_object.
+
+    DATA: lv_message    TYPE string,
+          lv_class_name TYPE string.
+
+
+    lv_class_name = class_name( is_item ).
+
+    TRY.
+        CREATE OBJECT ri_obj TYPE (lv_class_name)
+          EXPORTING
+            is_item = is_item.
+      CATCH cx_sy_create_object_error.
+        TRY.
+* 2nd step, try looking for plugins
+            CREATE OBJECT ri_obj TYPE lcl_objects_bridge
+              EXPORTING
+                is_item = is_item.
+          CATCH cx_sy_create_object_error.
+            CONCATENATE 'Object type' is_item-obj_type 'not supported, serialize'
+              INTO lv_message
+              SEPARATED BY space.                           "#EC NOTEXT
+            _raise lv_message.
+        ENDTRY.
+    ENDTRY.
+
+  ENDMETHOD.
+
+
+
+... snip
+
+
+
+CLASS lcl_objects_bridge DEFINITION INHERITING FROM lcl_objects_super FINAL.
+
+  PUBLIC SECTION.
+    METHODS constructor
+      IMPORTING is_item TYPE ty_item
+      RAISING   cx_sy_create_object_error.
+
+    INTERFACES lif_object.
+
+  PRIVATE SECTION.
+    DATA: mo_plugin TYPE REF TO object.
+
+ENDCLASS.
+
+CLASS lcl_objects_bridge IMPLEMENTATION.
+
+  METHOD constructor.
+
+    DATA: lv_name TYPE string.
+
+
+    super->constructor( is_item ).
+
+    CONCATENATE 'ZCL_ABAPGIT_OBJECT_' is_item-obj_type INTO lv_name.
+
+    CREATE OBJECT mo_plugin TYPE (lv_name)
+      EXPORTING
+        iv_obj_name = is_item-obj_name.
+
+  ENDMETHOD.
+
+  METHOD lif_object~serialize.
+
+    DATA: lv_count TYPE i,
+          ls_file  TYPE ty_file,
+          lo_files TYPE REF TO object.
+
+
+    CALL METHOD mo_plugin->('GET_FILES')
+      RECEIVING
+        ro_files = lo_files.
+
+    CALL METHOD lo_files->('CLEAR').
+
+* todo, some kind of exception handling, find some standard
+* message based exception class and use?
+    CALL METHOD mo_plugin->('ZIF_ABAPGIT_PLUGIN~SERIALIZE').
+
+    CALL METHOD lo_files->('COUNT')
+      RECEIVING
+        rv_count = lv_count.
+
+* transfer serialized files to mo_files
+    DO lv_count TIMES.
+      CALL METHOD lo_files->('POP')
+        EXPORTING
+          ev_filename = ls_file-filename
+          ev_data     = ls_file-data.
+      ls_file-path = '/'. " todo
+
+      mo_files->add( ls_file ).
+    ENDDO.
+
+  ENDMETHOD.
+
+  METHOD lif_object~deserialize.
+
+    DATA: lo_files TYPE REF TO object,
+          lt_files TYPE ty_files_tt.
+
+    FIELD-SYMBOLS: <ls_file> LIKE LINE OF lt_files.
+
+
+    CALL METHOD mo_plugin->('GET_FILES')
+      RECEIVING
+        ro_files = lo_files.
+
+    CALL METHOD lo_files->('CLEAR').
+
+* transfer files from mo_files to external
+    lt_files = mo_files->get_files( ).
+    LOOP AT lt_files ASSIGNING <ls_file>.
+      CALL METHOD lo_files->('PUSH')
+        EXPORTING
+          iv_filename = <ls_file>-filename
+          iv_data     = <ls_file>-data.
+    ENDLOOP.
+
+    CALL METHOD mo_plugin->('ZIF_ABAPGIT_PLUGIN~DESERIALIZE').
+
+  ENDMETHOD.
+
+  METHOD lif_object~delete.
+
+    CALL METHOD mo_plugin->('ZIF_ABAPGIT_PLUGIN~DELETE').
+
+  ENDMETHOD.
+
+  METHOD lif_object~exists.
+
+    CALL METHOD mo_plugin->('ZIF_ABAPGIT_PLUGIN~EXISTS')
+      RECEIVING
+        rv_bool = rv_bool.
+
+  ENDMETHOD.
+
+  METHOD lif_object~jump.
+
+    CALL METHOD mo_plugin->('ZIF_ABAPGIT_PLUGIN~JUMP').
+
+  ENDMETHOD.
+
+ENDCLASS.
