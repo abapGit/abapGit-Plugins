@@ -25,7 +25,7 @@ ENDMETHOD.
 
 METHOD zif_abapgit_plugin~deserialize.
 
-  mo_files->read_xml( ).
+*  ro_files->read_xml( ).
 
 ENDMETHOD.
 
@@ -33,6 +33,7 @@ ENDMETHOD.
 METHOD zif_abapgit_plugin~exists.
 
 * todo
+  rv_bool = abap_true.
 
 ENDMETHOD.
 

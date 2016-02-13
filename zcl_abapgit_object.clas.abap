@@ -7,14 +7,14 @@ public section.
 
   methods CONSTRUCTOR
     importing
-      !IO_FILES type ref to ZCL_ABAPGIT_FILE_CONTAINER
-      !IV_OBJ_NAME type TADIR-OBJ_NAME
-      !IV_OBJ_TYPE type TADIR-OBJECT .
+      !IV_OBJ_NAME type TADIR-OBJ_NAME .
+  methods GET_FILES
+    returning
+      value(RO_FILES) type ref to ZCL_ABAPGIT_FILE_CONTAINER .
 protected section.
 
-  data MO_FILES type ref to ZCL_ABAPGIT_FILE_CONTAINER .
   data MV_OBJ_NAME type TADIR-OBJ_NAME .
-  data MV_OBJ_TYPE type TADIR-OBJECT .
+  data MO_FILES type ref to ZCL_ABAPGIT_FILE_CONTAINER .
 private section.
 ENDCLASS.
 
@@ -25,9 +25,16 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
 
 METHOD constructor.
 
-  mo_files = io_files.
   mv_obj_name = iv_obj_name.
-  mv_obj_type = iv_obj_type.
+
+  CREATE OBJECT mo_files.
+
+ENDMETHOD.
+
+
+METHOD get_files.
+
+  ro_files = mo_files.
 
 ENDMETHOD.
 ENDCLASS.

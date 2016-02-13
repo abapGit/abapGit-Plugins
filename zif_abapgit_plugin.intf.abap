@@ -9,6 +9,6 @@ interface ZIF_ABAPGIT_PLUGIN
   methods DELETE .
   methods EXISTS
     returning
-      value(RV_EXISTS) type ABAP_BOOL .
+      value(RV_BOOL) type ABAP_BOOL .
   methods JUMP .
 endinterface.
