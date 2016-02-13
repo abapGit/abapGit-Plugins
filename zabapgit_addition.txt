@@ -16,11 +16,13 @@ CLASS lcl_objects:
           EXPORTING
             is_item = is_item.
       CATCH cx_sy_create_object_error.
+************* BEGIN ADDITION      
         TRY.
 * 2nd step, try looking for plugins
             CREATE OBJECT ri_obj TYPE lcl_objects_bridge
               EXPORTING
                 is_item = is_item.
+************* END ADDITION
           CATCH cx_sy_create_object_error.
             CONCATENATE 'Object type' is_item-obj_type 'not supported, serialize'
               INTO lv_message
