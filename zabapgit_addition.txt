@@ -37,6 +37,7 @@ CLASS lcl_objects:
 
 ... snip
 
+New class:
 
 
 CLASS lcl_objects_bridge DEFINITION INHERITING FROM lcl_objects_super FINAL.
