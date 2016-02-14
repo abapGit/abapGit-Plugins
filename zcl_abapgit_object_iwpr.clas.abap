@@ -47,7 +47,7 @@ ENDMETHOD.
 
 METHOD zif_abapgit_plugin~serialize.
 
-  mo_files->add_xml( ).
+*  me->get_files_( )->add_xml( ).
 
 ENDMETHOD.
 ENDCLASS.
