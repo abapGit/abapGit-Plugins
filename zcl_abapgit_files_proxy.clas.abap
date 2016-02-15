@@ -46,6 +46,7 @@ CLASS zcl_abapgit_files_proxy DEFINITION
         RETURNING VALUE(rt_files) TYPE ty_files_tt,
       set_files
         IMPORTING it_files TYPE ty_files_tt.
+
   PRIVATE SECTION.
 
     DATA: mo_objects_files TYPE REF TO object.
