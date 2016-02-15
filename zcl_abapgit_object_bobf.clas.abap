@@ -1,16 +1,14 @@
-CLASS zcl_abapgit_object_bobf DEFINITION
-  PUBLIC
-  INHERITING FROM zcl_abapgit_saplink_adapter
-  FINAL
-  CREATE PUBLIC .
+class ZCL_ABAPGIT_OBJECT_BOBF definition
+  public
+  inheriting from ZCL_ABAPGIT_SAPLINK_ADAPTER
+  final
+  create public .
 
-  PUBLIC SECTION.
+public section.
 
-    METHODS constructor
-      importing
-        !iv_obj_name          TYPE tadir-obj_name
-        !io_helper_factory    type ref to object.
-
+  methods CONSTRUCTOR
+    importing
+      !IV_OBJ_NAME type TADIR-OBJ_NAME .
   PROTECTED SECTION.
   PRIVATE SECTION.
 ENDCLASS.
@@ -24,7 +22,6 @@ CLASS ZCL_ABAPGIT_OBJECT_BOBF IMPLEMENTATION.
     super->constructor(
         iv_saplink_classname = 'ZSAPLINK_BOPF'
         iv_obj_name          = iv_obj_name
-        io_helper_factory    = io_helper_factory
      ).
   ENDMETHOD.
 ENDCLASS.

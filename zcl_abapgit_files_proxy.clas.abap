@@ -1,7 +1,8 @@
 CLASS zcl_abapgit_files_proxy DEFINITION
     PUBLIC
     FINAL
-    CREATE PUBLIC .
+    CREATE PRIVATE
+    GLOBAL FRIENDS zcl_abapgit_object.
 
   PUBLIC SECTION.
     TYPES: BEGIN OF ty_file,
@@ -12,10 +13,9 @@ CLASS zcl_abapgit_files_proxy DEFINITION
     TYPES: ty_files_tt TYPE STANDARD TABLE OF ty_file WITH DEFAULT KEY.
 
     METHODS:
-      constructor
-        IMPORTING io_objects_files TYPE REF TO object ,
       get_wrapped_object
-        RETURNING VALUE(ro_objects_files) TYPE REF TO object,
+        RETURNING VALUE(ro_objects_files) TYPE REF TO object.
+    METHODS:
       add_html
         IMPORTING iv_html TYPE string
         RAISING   zcx_abapgit_object,
@@ -46,10 +46,12 @@ CLASS zcl_abapgit_files_proxy DEFINITION
         RETURNING VALUE(rt_files) TYPE ty_files_tt,
       set_files
         IMPORTING it_files TYPE ty_files_tt.
-
   PRIVATE SECTION.
 
     DATA: mo_objects_files TYPE REF TO object.
+
+    METHODS constructor
+      IMPORTING io_objects_files TYPE REF TO object.
 
 ENDCLASS.
 
@@ -90,6 +92,13 @@ CLASS ZCL_ABAPGIT_FILES_PROXY IMPLEMENTATION.
 
 
   METHOD constructor.
+*    This class acts as proxy for the local implementation of lcl_files_objects in ZABAPGIT.
+*    It provides plugins a typed API without duplicating the implementation
+
+* delegate all the method calls to the proxied object.
+*  potential optimization ( minor priority): Implement a generic RTTI-based
+*  method call generation so that interface changes would have to be done to the
+*  definition of this class only
     mo_objects_files = io_objects_files.
   ENDMETHOD.
 
@@ -124,14 +133,14 @@ CLASS ZCL_ABAPGIT_FILES_PROXY IMPLEMENTATION.
 
 
   METHOD read_xml.
-  data lo_xml type ref to object.
+    DATA lo_xml TYPE REF TO object.
     CALL METHOD mo_objects_files->('READ_XML')
       EXPORTING
         iv_extra = iv_extra
       RECEIVING
         ro_xml   = lo_xml.
 
-        ro_xml = new #( lo_xml ).
+    ro_xml = NEW #( lo_xml ).
   ENDMETHOD.
 
 

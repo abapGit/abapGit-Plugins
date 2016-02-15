@@ -1,15 +1,21 @@
 CLASS zcl_abapgit_xml_proxy DEFINITION
   PUBLIC
   FINAL
-  CREATE PUBLIC .
+  CREATE PRIVATE
+  GLOBAL FRIENDS zcl_abapgit_object
+                 zcl_abapgit_files_proxy.
 
   PUBLIC SECTION.
-    METHODS constructor
-      IMPORTING io_xml TYPE REF TO object
+
+    CLASS-METHODS create
+      IMPORTING
+                iv_xml              TYPE string OPTIONAL
+                iv_empty            TYPE abap_bool DEFAULT abap_false
+      RETURNING VALUE(ro_xml_proxy) TYPE REF TO zcl_abapgit_xml_proxy
       RAISING   zcx_abapgit_object.
 
-    methods get_wrapped_object
-    RETURNING VALUE(ro_xml) type ref to object.
+    METHODS get_wrapped_object
+      RETURNING VALUE(ro_xml) TYPE REF TO object.
 
     METHODS element_add
       IMPORTING ig_element TYPE data
@@ -68,6 +74,10 @@ CLASS zcl_abapgit_xml_proxy DEFINITION
 
   PRIVATE SECTION.
     DATA: mo_xml TYPE REF TO object.
+
+    METHODS constructor
+      IMPORTING io_xml TYPE REF TO object
+      RAISING   zcx_abapgit_object.
 ENDCLASS.
 
 
@@ -77,6 +87,17 @@ CLASS ZCL_ABAPGIT_XML_PROXY IMPLEMENTATION.
 
   METHOD constructor.
     mo_xml = io_xml.
+  ENDMETHOD.
+
+
+  METHOD create.
+    DATA lo_xml TYPE REF TO object.
+    CREATE OBJECT lo_xml TYPE ('\PROGRAM=ZABAPGIT\CLASS=LCL_XML')
+      EXPORTING
+        iv_xml   = iv_xml
+        iv_empty = iv_empty.
+
+    ro_xml_proxy = NEW #( lo_xml ).
   ENDMETHOD.
 
 

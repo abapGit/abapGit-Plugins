@@ -7,8 +7,7 @@ CLASS zcl_abapgit_object DEFINITION
 
     METHODS constructor
       IMPORTING
-        !iv_obj_name       TYPE tadir-obj_name
-        !io_helper_factory TYPE REF TO object.
+        !iv_obj_name       TYPE tadir-obj_name.
 
     METHODS get_files FINAL
       RETURNING
@@ -22,7 +21,9 @@ CLASS zcl_abapgit_object DEFINITION
       IMPORTING
                 iv_xml              TYPE string OPTIONAL
                 iv_empty            TYPE abap_bool DEFAULT abap_false
-      RETURNING VALUE(ro_xml_proxy) TYPE REF TO zcl_abapgit_xml_proxy.
+      RETURNING VALUE(ro_xml_proxy) TYPE REF TO zcl_abapgit_xml_proxy
+      RAISING   zcx_abapgit_object.
+
 
   PROTECTED SECTION.
 
@@ -30,7 +31,6 @@ CLASS zcl_abapgit_object DEFINITION
 
   PRIVATE SECTION.
     DATA mo_files_proxy TYPE REF TO zcl_abapgit_files_proxy .
-    DATA mo_helper_factory TYPE REF TO object.
 ENDCLASS.
 
 
@@ -41,20 +41,19 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
   METHOD constructor.
 
     mv_obj_name = iv_obj_name.
-    mo_helper_factory = io_helper_factory.
 
   ENDMETHOD.
 
 
   METHOD create_xml.
-    DATA lo_xml TYPE REF TO object.
-    CALL METHOD mo_helper_factory->('CREATE_XML')
-      EXPORTING
-        iv_xml   = iv_xml
-        iv_empty = iv_empty
-      RECEIVING
-        ro_xml   = lo_xml.
-    ro_xml_proxy = new #( lo_xml ).
+*    wrap the xml proxy creation. Advantages:
+*    - simplified consumption
+*    - ability to move the proxy class implementation
+    ro_xml_proxy = zcl_abapgit_xml_proxy=>create(
+                   iv_xml             = iv_xml
+                   iv_empty           = iv_empty
+               ).
+
   ENDMETHOD.
 
 
