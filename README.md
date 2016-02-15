@@ -1,2 +1,7 @@
 # abapGit-Plugins
-work in progress, poc, testing
+This repository contains plugins for ABAPGit to support other objecttypes.
+
+# ABAPGit-Bridge
+ABAPGit allows easy syncing of Git-Repositories with ABAP packages. 
+However, the support for oject types is not yet as wide as the object-support by SAPLink.
+Thus, I implemented an adapter which wraps SAPLink-Plugins in order to use them with ABAPGit
