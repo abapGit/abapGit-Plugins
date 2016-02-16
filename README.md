@@ -1,6 +1,5 @@
 # abapGit-Plugins
-This repository contains plugins for abapGit to support other objecttypes.
-Most prominently, it contains a generic implementation wrapping SAPLink-Plugins.
+This repository contains plugins for abapGit to support other objecttypes. Most prominently, it contains a generic implementation wrapping SAPLink-Plugins.
 
 # abapGit-SAPLink-Bridge
 abapGit allows easy syncing of Git-Repositories with ABAP packages.
