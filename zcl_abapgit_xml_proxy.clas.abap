@@ -107,7 +107,7 @@ CLASS ZCL_ABAPGIT_XML_PROXY IMPLEMENTATION.
         ig_element = ig_element
         iv_name    = iv_name
         ii_root    = ii_root.
-    .
+
   ENDMETHOD.
 
 

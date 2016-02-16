@@ -50,9 +50,8 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
 *    - simplified consumption
 *    - ability to move the proxy class implementation
     ro_xml_proxy = zcl_abapgit_xml_proxy=>create(
-                   iv_xml             = iv_xml
-                   iv_empty           = iv_empty
-               ).
+                     iv_xml   = iv_xml
+                     iv_empty = iv_empty ).
 
   ENDMETHOD.
 
