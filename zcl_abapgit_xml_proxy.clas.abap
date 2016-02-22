@@ -44,7 +44,7 @@ CLASS zcl_abapgit_xml_proxy DEFINITION
       RAISING   zcx_abapgit_object.
 
     METHODS table_add
-      IMPORTING it_table TYPE STANDARD TABLE
+      IMPORTING it_table TYPE ANY TABLE
                 iv_name  TYPE string OPTIONAL
                 ii_root  TYPE REF TO if_ixml_element OPTIONAL
       RAISING   zcx_abapgit_object.
@@ -52,7 +52,7 @@ CLASS zcl_abapgit_xml_proxy DEFINITION
     METHODS table_read
       IMPORTING ii_root  TYPE REF TO if_ixml_element OPTIONAL
                 iv_name  TYPE string OPTIONAL
-      CHANGING  ct_table TYPE STANDARD TABLE
+      CHANGING  ct_table TYPE ANY TABLE
       RAISING   zcx_abapgit_object.
 
     METHODS xml_render
@@ -72,6 +72,7 @@ CLASS zcl_abapgit_xml_proxy DEFINITION
                 iv_name           TYPE string
       RETURNING VALUE(ri_element) TYPE REF TO if_ixml_element.
 
+  PROTECTED SECTION.
   PRIVATE SECTION.
     DATA: mo_xml TYPE REF TO object.
 
@@ -91,13 +92,26 @@ CLASS ZCL_ABAPGIT_XML_PROXY IMPLEMENTATION.
 
 
   METHOD create.
-    DATA lo_xml TYPE REF TO object.
-    CREATE OBJECT lo_xml TYPE ('\PROGRAM=ZABAPGIT\CLASS=LCL_XML')
-      EXPORTING
-        iv_xml   = iv_xml
-        iv_empty = iv_empty.
-
-    ro_xml_proxy = NEW #( lo_xml ).
+    DATA lo_xml     TYPE REF TO object.
+    DATA lx_root    TYPE REF TO cx_root.
+    TRY.
+        IF iv_xml IS SUPPLIED.
+          CREATE OBJECT lo_xml TYPE ('\PROGRAM=ZABAPGIT\CLASS=LCL_XML')
+            EXPORTING
+              iv_xml   = iv_xml
+              iv_empty = iv_empty.
+        ELSE.
+          CREATE OBJECT lo_xml TYPE ('\PROGRAM=ZABAPGIT\CLASS=LCL_XML')
+            EXPORTING
+              iv_empty = iv_empty.
+        ENDIF.
+      CATCH cx_root INTO lx_root.
+        RAISE EXCEPTION TYPE zcx_abapgit_object
+          EXPORTING
+            iv_text  = lx_root->get_text( )
+            previous = lx_root.
+    ENDTRY.
+    CREATE OBJECT ro_xml_proxy EXPORTING io_xml = lo_xml.
   ENDMETHOD.
 
 
