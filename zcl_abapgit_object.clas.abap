@@ -5,7 +5,7 @@ CLASS zcl_abapgit_object DEFINITION
 
   PUBLIC SECTION.
 
-    METHODS constructor
+    methods set_item
       IMPORTING
         !iv_obj_type TYPE tadir-object
         !iv_obj_name TYPE tadir-obj_name.
@@ -25,6 +25,8 @@ CLASS zcl_abapgit_object DEFINITION
       RETURNING VALUE(ro_xml_proxy) TYPE REF TO zcl_abapgit_xml_proxy
       RAISING   zcx_abapgit_object.
 
+    METHODS get_supported_obj_types ABSTRACT
+      RETURNING VALUE(rt_obj_type) TYPE objtyptable.
 
   PROTECTED SECTION.
     DATA mv_obj_type TYPE tadir-object.
@@ -45,7 +47,7 @@ CLASS zcl_abapgit_object DEFINITION
 
     METHODS change_object_directory_entry
       IMPORTING
-        iv_delete   TYPE abap_bool
+        iv_delete  TYPE abap_bool
         iv_package TYPE devclass
       RAISING
         zcx_abapgit_object.
@@ -69,7 +71,7 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
         wi_tadir_object                = lv_tadir_object    " Input for TADIR field OBJECT
         wi_tadir_obj_name              = mv_obj_name    " Input for TADIR field OBJ_NAME
         wi_tadir_devclass              = iv_package
-      exceptions
+      EXCEPTIONS
         tadir_entry_not_existing       = 1
         tadir_entry_ill_type           = 2
         no_systemname                  = 3
@@ -94,7 +96,7 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
         object_locked_for_order        = 22
         change_of_class_not_allowed    = 23
         no_change_from_sap_to_tmp      = 24
-        others                         = 25.
+        OTHERS                         = 25.
     IF sy-subrc <> 0.
       MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
                  WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO lv_exception_text.
@@ -102,14 +104,6 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
         EXPORTING
           iv_text = lv_exception_text.
     ENDIF.
-  ENDMETHOD.
-
-
-  METHOD constructor.
-
-    mv_obj_type = iv_obj_type.
-    mv_obj_name = iv_obj_name.
-
   ENDMETHOD.
 
 
@@ -145,5 +139,13 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
     CREATE OBJECT mo_files_proxy
       EXPORTING
         io_objects_files = io_objects_files.
+  ENDMETHOD.
+
+
+  METHOD set_item.
+
+    mv_obj_type = iv_obj_type.
+    mv_obj_name = iv_obj_name.
+
   ENDMETHOD.
 ENDCLASS.
