@@ -19,9 +19,9 @@ INTERFACE lif_external_object_container.
            decimals  TYPE i,
            is_key    TYPE abap_bool,
          END OF ty_s_component,
-         ty_t_component TYPE SORTED TABLE OF ty_s_component WITH UNIQUE KEY primary_key COMPONENTS pos
-                                               WITH UNIQUE SORTED KEY name COMPONENTS name
-                                               WITH NON-UNIQUE SORTED KEY is_key COMPONENTS is_key pos.
+         ty_t_component TYPE STANDARD TABLE OF ty_s_component WITH KEY primary_key COMPONENTS pos
+                                          WITH UNIQUE SORTED KEY name COMPONENTS name
+                                          WITH NON-UNIQUE SORTED KEY is_key COMPONENTS is_key pos.
   TYPES:
     BEGIN OF ty_s_table_content,
       tabname       TYPE tabname,
@@ -126,7 +126,6 @@ CLASS lcl_tlogo_bridge DEFINITION.
       get_where_clause
         IMPORTING
                   iv_tobj_name            TYPE sobj_name
-                  iv_objname              LIKE mv_object_name
         RETURNING VALUE(rv_where_on_keys) TYPE string.
 
     METHODS before_export.
@@ -143,6 +142,12 @@ CLASS lcl_tlogo_bridge DEFINITION.
         it_data       TYPE STANDARD TABLE.
   PRIVATE SECTION.
 
+TYPES: BEGIN OF ty_s_objkey ,
+             num   TYPE numc3,
+             value TYPE char128,
+           END OF ty_s_objkey,
+           ty_t_objkey TYPE SORTED TABLE OF ty_s_objkey WITH UNIQUE KEY num.
+
     METHODS val_fieldcatalog_compatibility
       IMPORTING
                 it_imported_fieldcatalog TYPE lif_external_object_container=>ty_t_component
@@ -150,11 +155,21 @@ CLASS lcl_tlogo_bridge DEFINITION.
       EXPORTING
                 ev_is_identical          TYPE abap_bool
       RAISING   lcx_obj_exception.
+
     METHODS do_delete
       IMPORTING
         iv_table_name    TYPE lcl_tlogo_bridge=>ty_s_object_table-tobj_name
         iv_where_on_keys TYPE string.
+
     METHODS is_unittest
       RETURNING VALUE(rv_is_unittest) TYPE abap_bool.
+
+    METHODS split_value_to_keys
+      IMPORTING
+        it_key_component TYPE lcl_tlogo_bridge=>ty_s_object_table-field_catalog
+      CHANGING
+        ct_objkey        TYPE lcl_tlogo_bridge=>ty_t_objkey
+        cs_objkey        TYPE lcl_tlogo_bridge=>ty_s_objkey
+        cv_non_value_pos TYPE numc3.
 
 ENDCLASS.

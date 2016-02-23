@@ -72,10 +72,13 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
       lt_included_view = lo_structdescr->get_included_view( p_level = 1000 ). "There should not be more inclusion-levels than that - even in ERP
       CLEAR <ls_object_table>-field_catalog.
 
+      DATA lv_pos LIKE ls_field_cat_comp-pos.
+      CLEAR lv_pos.
       LOOP AT lt_included_view INTO ls_component.
         CLEAR ls_field_cat_comp.
 
-        ADD 1 TO ls_field_cat_comp-pos.
+        ADD 1 TO lv_pos.
+        ls_field_cat_comp-pos = lv_pos.
         ls_field_cat_comp-name = ls_component-name.
         TRY.
             lo_elemdescr ?= ls_component-type.
@@ -84,12 +87,13 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
               EXPORTING
                 iv_text = |Structured database table structures as in { <ls_object_table>-tobj_name } are not expected and not yet supported|.
         ENDTRY.
-        ls_field_cat_comp-type_kind  = lo_elemdescr->type_kind.
-        ls_field_cat_comp-length     = lo_elemdescr->length.
-        ls_field_cat_comp-decimals   = lo_elemdescr->decimals.
 
         READ TABLE lt_dfies ASSIGNING <ls_dfies> WITH KEY fieldname = ls_field_cat_comp-name.
         ASSERT sy-subrc = 0. "Can't imagine why an element may have a different name than the field.
+
+        ls_field_cat_comp-type_kind  = lo_elemdescr->type_kind.
+        ls_field_cat_comp-length     = <ls_dfies>-leng. "lo_elemdescr->length funnily return the byte-length
+        ls_field_cat_comp-decimals   = lo_elemdescr->decimals.
 
         ls_field_cat_comp-is_key = <ls_dfies>-keyflag.
 
@@ -162,8 +166,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
     FIELD-SYMBOLS <ls_imported_prim_tab_content> LIKE LINE OF lt_imported_table_content.
 
     ls_primary_table = me->get_primary_table( ).
-    lv_where_primary_table = me->get_where_clause( iv_tobj_name     = ls_primary_table-tobj_name
-                                                   iv_objname       = mv_object_name ).
+    lv_where_primary_table = me->get_where_clause( iv_tobj_name     = ls_primary_table-tobj_name ).
 
     READ TABLE lt_imported_table_content ASSIGNING <ls_imported_prim_tab_content> WITH TABLE KEY tabname = ls_primary_table-tobj_name.
     IF sy-subrc NE 0.
@@ -336,8 +339,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
 
     ls_primary_table = get_primary_table( ).
 
-    lv_where_clause = me->get_where_clause( iv_tobj_name     = ls_primary_table-tobj_name
-                                            iv_objname       = mv_object_name ).
+    lv_where_clause = me->get_where_clause( ls_primary_table-tobj_name ).
 
     DATA lr_table_line TYPE REF TO data.
     FIELD-SYMBOLS <ls_table_line> TYPE any.
@@ -350,24 +352,27 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD get_where_clause.
-    TYPES: BEGIN OF ty_s_objkey ,
-             num   TYPE numc3,
-             value TYPE char128,
-           END OF ty_s_objkey,
-           ty_t_objkey TYPE SORTED TABLE OF ty_s_objkey WITH UNIQUE KEY num.
-
     FIELD-SYMBOLS <ls_object_table> LIKE LINE OF mt_object_table.
     READ TABLE mt_object_table ASSIGNING <ls_object_table> WITH KEY table_name COMPONENTS tobj_name = iv_tobj_name.
     ASSERT sy-subrc = 0.
 
-    DATA lv_objkey_pos          TYPE i.
-    DATA lv_next_objkey_pos     TYPE i.
-    DATA lv_value_pos           TYPE i.
-    DATA lv_objkey_length       TYPE i.
-    DATA lt_objkey              TYPE ty_t_objkey.
-    DATA ls_objkey              LIKE LINE OF lt_objkey.
-    DATA lv_non_value_pos       TYPE numc3.
+    DATA lv_objkey_pos                TYPE i.
+    DATA lv_next_objkey_pos           TYPE i.
+    DATA lv_value_pos                 TYPE i.
+    DATA lv_objkey_length             TYPE i.
+    DATA lt_objkey                    TYPE ty_t_objkey.
+    DATA ls_objkey                    LIKE LINE OF lt_objkey.
+    DATA lv_non_value_pos             TYPE numc3.
+    DATA lt_key_component             LIKE <ls_object_table>-field_catalog.
+    DATA lt_key_component_uncovered   LIKE <ls_object_table>-field_catalog.
+    DATA ls_key_component_uncovered   LIKE LINE OF lt_key_component_uncovered.
+    DATA ls_fieldcat_component        LIKE LINE OF lt_key_component.
 
+    CLEAR lt_key_component.
+    LOOP AT <ls_object_table>-field_catalog INTO ls_fieldcat_component USING KEY is_key
+        WHERE is_key = abap_true.
+      INSERT ls_fieldcat_component INTO TABLE lt_key_component.
+    ENDLOOP.
 
 *   analyze the object key and compose the key (table)
     CLEAR lt_objkey.
@@ -381,10 +386,17 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
 *     command
       IF <ls_object_table>-tobjkey+lv_objkey_pos(1) = '/'.
         IF NOT ls_objkey-value IS INITIAL.
-          INSERT ls_objkey INTO TABLE lt_objkey.
-          ADD 1 TO lv_non_value_pos.
-          CLEAR ls_objkey.
-          ls_objkey-num = lv_non_value_pos.
+*        We reached the end of a key-definition.
+*        this key part may address multiple fields.
+*        E. g. six characters may address one boolean field and a five-digit version field.
+*        Thus, we need to analyze the remaining key components which have not been covered yet.
+          split_value_to_keys(
+            EXPORTING
+              it_key_component = lt_key_component
+            CHANGING
+              ct_objkey        = lt_objkey
+              cs_objkey        = ls_objkey
+              cv_non_value_pos = lv_non_value_pos ).
         ENDIF.
         lv_next_objkey_pos = lv_objkey_pos + 1.
 *       '*' means all further key values
@@ -396,7 +408,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
           ADD 1 TO lv_objkey_pos.
 *       object name
         ELSEIF <ls_object_table>-tobjkey+lv_next_objkey_pos(1) = '&'.
-          ls_objkey-value = iv_objname.
+          ls_objkey-value = mv_object_name.
 * #CP-SUPPRESS: FP no risc
           INSERT ls_objkey INTO TABLE lt_objkey.
           CLEAR ls_objkey.
@@ -405,6 +417,13 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
 *       language
         ELSEIF <ls_object_table>-tobjkey+lv_next_objkey_pos(1) = 'L'.
           ls_objkey-value = sy-langu.
+          INSERT ls_objkey INTO TABLE lt_objkey.
+          CLEAR ls_objkey.
+          ADD 1 TO lv_non_value_pos.
+          ADD 1 TO lv_objkey_pos.
+*       Client
+        ELSEIF <ls_object_table>-tobjkey+lv_next_objkey_pos(1) = 'C'.
+          ls_objkey-value = sy-mandt.
           INSERT ls_objkey INTO TABLE lt_objkey.
           CLEAR ls_objkey.
           ADD 1 TO lv_non_value_pos.
@@ -420,7 +439,13 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
       ADD 1 TO lv_objkey_pos.
     ENDWHILE.
     IF NOT ls_objkey-value IS INITIAL.
-      INSERT ls_objkey INTO TABLE lt_objkey.
+      split_value_to_keys(
+            EXPORTING
+              it_key_component = lt_key_component
+            CHANGING
+              ct_objkey        = lt_objkey
+              cs_objkey        = ls_objkey
+              cv_non_value_pos = lv_non_value_pos ).
     ENDIF.
 
 *   compose the where clause
@@ -463,7 +488,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
         lv_value128 INTO lv_where_statement SEPARATED BY space.
       ADD 1 TO lv_key_pos.
     ENDLOOP.
-    rv_where_on_keys = lv_where_statement.
+    rv_where_on_keys = condense( lv_where_statement ).
   ENDMETHOD.
 
 
@@ -483,10 +508,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
       CREATE DATA ls_table_content-data_tab TYPE STANDARD TABLE OF (<ls_object_table>-tobj_name).
       ASSIGN ls_table_content-data_tab->* TO <lt_data>.
 
-      lv_where_on_keys = me->get_where_clause(
-                         iv_tobj_name     = <ls_object_table>-tobj_name
-                         iv_objname       = mv_object_name
-                     ).
+      lv_where_on_keys = me->get_where_clause( <ls_object_table>-tobj_name ).
 
       SELECT * FROM (<ls_object_table>-tobj_name)
         INTO TABLE <lt_data>
@@ -584,8 +606,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
     FIELD-SYMBOLS <ls_local_object_table> LIKE LINE OF mt_object_table.
 
     LOOP AT mt_object_table ASSIGNING <ls_local_object_table>.
-      lv_where_on_keys = me->get_where_clause(  iv_tobj_name     = <ls_local_object_table>-tobj_name
-                                                iv_objname       = mv_object_name ).
+      lv_where_on_keys = me->get_where_clause( <ls_local_object_table>-tobj_name ).
 
       do_delete(    iv_table_name       = <ls_local_object_table>-tobj_name
                     iv_where_on_keys    = lv_where_on_keys ).
@@ -607,6 +628,44 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
 
     READ TABLE lt_callstack TRANSPORTING NO FIELDS WITH KEY progname = 'CL_AUNIT_TEST_CLASS===========CP' ##no_text.
     rv_is_unittest = boolc( sy-subrc = 0 ).
+  ENDMETHOD.
+
+
+
+
+  METHOD split_value_to_keys.
+
+    DATA lt_key_component_uncovered TYPE lcl_tlogo_bridge=>ty_s_object_table-field_catalog.
+    DATA ls_key_component_uncovered TYPE lif_external_object_container=>ty_s_component.
+
+    lt_key_component_uncovered = it_key_component.
+    DATA ls_dummy LIKE LINE OF ct_objkey.
+    LOOP AT ct_objkey INTO ls_dummy.
+      DELETE lt_key_component_uncovered INDEX 1.
+    ENDLOOP.
+
+    DATA ls_objkey_sub     LIKE cs_objkey.
+    DATA lv_objkey_sub_pos TYPE i.
+
+    ls_objkey_sub-num = cs_objkey-num.
+    lv_objkey_sub_pos = 0.
+    LOOP AT lt_key_component_uncovered INTO ls_key_component_uncovered.
+      CLEAR ls_objkey_sub-value.
+      ls_objkey_sub-value = cs_objkey-value+lv_objkey_sub_pos(ls_key_component_uncovered-length).
+      ls_objkey_sub-num = cv_non_value_pos.
+
+      INSERT ls_objkey_sub INTO TABLE ct_objkey.
+
+      ADD ls_key_component_uncovered-length TO lv_objkey_sub_pos.
+      ADD 1 TO cv_non_value_pos.
+      CLEAR ls_objkey_sub.
+
+      IF lv_objkey_sub_pos = strlen( cs_objkey-value ).
+        cs_objkey-num = cv_non_value_pos.
+        EXIT. "end splitting - all characters captured
+      ENDIF.
+    ENDLOOP.
+
   ENDMETHOD.
 
 ENDCLASS.
