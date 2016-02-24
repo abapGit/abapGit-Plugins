@@ -124,12 +124,12 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD export_object.
-    DATA ls_table_content TYPE lif_external_object_container=>ty_s_table_content.
-    FIELD-SYMBOLS <ls_object_table> LIKE LINE OF mt_object_table.
+    DATA lt_table_content TYPE lif_external_object_container=>ty_t_table_content.
     me->before_export( ).
 
-    me->get_current_tables_content( io_object_container ).
-
+    me->get_current_tables_content(
+        EXPORTING io_object_container = io_object_container "this allows the container to store tables one-by-one
+        IMPORTING et_table_content    = lt_table_content ).
 
   ENDMETHOD.
 
@@ -229,33 +229,32 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
             IMPORTING
               ev_is_identical          = lv_structures_identical ).
 
-*      Bug in LCL_XML: The imported data is twice as long as the exported one with respect to character-based fields
-***********      IF lv_structures_identical = abap_true.
-***********        do_insert(  iv_table_name = <ls_imported_table_content>-tabname
-***********                    it_data       = <lt_imported_data> ).
-***********      ELSE.
+**      IF lv_structures_identical = abap_true.
+**        do_insert(  iv_table_name = <ls_imported_table_content>-tabname
+**                    it_data       = <lt_imported_data> ).
+**      ELSE.
 *      as the structure deviate, it's not an option to directly insert from the imported table.
 *      The format needs to be adapted first (even in ABAP, there is no "INSERT INTO CORRESPONDING FIELDS OF dbtab" ;)
-      DATA lr_local_format_tab            TYPE REF TO data.
-      DATA lr_local_format                TYPE REF TO data.
-      FIELD-SYMBOLS <lt_local_format>     TYPE STANDARD TABLE.
-      FIELD-SYMBOLS <ls_local_format>     TYPE any.
-      FIELD-SYMBOLS <ls_imported_format>  TYPE any.
+        DATA lr_local_format_tab            TYPE REF TO data.
+        DATA lr_local_format                TYPE REF TO data.
+        FIELD-SYMBOLS <lt_local_format>     TYPE STANDARD TABLE.
+        FIELD-SYMBOLS <ls_local_format>     TYPE any.
+        FIELD-SYMBOLS <ls_imported_format>  TYPE any.
 
-      CREATE DATA lr_local_format_tab TYPE STANDARD TABLE OF (<ls_imported_table_content>-tabname) WITH DEFAULT KEY.
-      ASSIGN lr_local_format_tab->* TO <lt_local_format>.
+        CREATE DATA lr_local_format_tab TYPE STANDARD TABLE OF (<ls_imported_table_content>-tabname) WITH DEFAULT KEY.
+        ASSIGN lr_local_format_tab->* TO <lt_local_format>.
 
-      CREATE DATA lr_local_format TYPE (<ls_imported_table_content>-tabname).
-      ASSIGN lr_local_format->* TO <ls_local_format>.
+        CREATE DATA lr_local_format TYPE (<ls_imported_table_content>-tabname).
+        ASSIGN lr_local_format->* TO <ls_local_format>.
 
-      LOOP AT <lt_imported_data> ASSIGNING <ls_imported_format>.
-        MOVE-CORRESPONDING <ls_imported_format> TO <ls_local_format>.
-        INSERT <ls_local_format> INTO TABLE <lt_local_format>.
-      ENDLOOP.
+        LOOP AT <lt_imported_data> ASSIGNING <ls_imported_format>.
+          MOVE-CORRESPONDING <ls_imported_format> TO <ls_local_format>.
+          INSERT <ls_local_format> INTO TABLE <lt_local_format>.
+        ENDLOOP.
 
-      do_insert(    iv_table_name = <ls_imported_table_content>-tabname
-                    it_data       = <lt_local_format> ).
-***********      ENDIF.
+        do_insert(    iv_table_name = <ls_imported_table_content>-tabname
+                      it_data       = <lt_local_format> ).
+**      ENDIF.
     ENDLOOP.
 
 
@@ -737,92 +736,15 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
       ENDTRY.
 
 
-      DATA lo_structdescr   TYPE REF TO cl_abap_structdescr.
-      DATA lo_tabledescr    TYPE REF TO cl_abap_tabledescr.
-      DATA lt_component     TYPE cl_abap_structdescr=>component_table.
-      DATA ls_component     LIKE LINE OF lt_component.
-      DATA lx_parameter_invalid_range TYPE REF TO cx_parameter_invalid_range.
-      FIELD-SYMBOLS <ls_field_catalog> LIKE LINE OF <ls_table_content>-field_catalog.
+      DATA lo_tabledescr TYPE REF TO cl_abap_tabledescr.
 
-      CLEAR: ls_component, lt_component, lo_structdescr.
-      LOOP AT <ls_table_content>-field_catalog ASSIGNING <ls_field_catalog>.
-        ls_component-name = <ls_field_catalog>-name.
-        TRY.
-            CASE <ls_field_catalog>-type_kind.
-              WHEN    cl_abap_typedescr=>typekind_char
-                  OR  cl_abap_typedescr=>typekind_clike
-                  OR  cl_abap_typedescr=>typekind_csequence.
-                ls_component-type = cl_abap_elemdescr=>get_c( <ls_field_catalog>-length ).
-              WHEN cl_abap_typedescr=>typekind_date.
-                ls_component-type = cl_abap_elemdescr=>get_d( ).
-              WHEN cl_abap_typedescr=>typekind_decfloat
-              OR  cl_abap_typedescr=>typekind_float.
-                ls_component-type = cl_abap_elemdescr=>get_f( ).
-              WHEN  cl_abap_typedescr=>typekind_decfloat16.
-                ls_component-type = cl_abap_elemdescr=>get_decfloat16( ).
-              WHEN  cl_abap_typedescr=>typekind_decfloat34.
-                ls_component-type = cl_abap_elemdescr=>get_decfloat34( ).
-              WHEN cl_abap_typedescr=>typekind_hex.
-                ls_component-type = cl_abap_elemdescr=>get_x( <ls_field_catalog>-length ).
-              WHEN  cl_abap_typedescr=>typekind_int
-                OR  cl_abap_typedescr=>typekind_int1
-                OR  cl_abap_typedescr=>typekind_int2
-                OR  cl_abap_typedescr=>typekind_simple.
-                ls_component-type = cl_abap_elemdescr=>get_i( ).
-              WHEN  cl_abap_typedescr=>typekind_num
-                OR  cl_abap_typedescr=>typekind_numeric.
-                ls_component-type = cl_abap_elemdescr=>get_n( <ls_field_catalog>-length ).
-              WHEN  cl_abap_typedescr=>typekind_packed.
-                ls_component-type = cl_abap_elemdescr=>get_p(
-                    p_length                   = <ls_field_catalog>-length
-                    p_decimals                 = <ls_field_catalog>-decimals
-                ).
-              WHEN cl_abap_typedescr=>typekind_time.
-                ls_component-type = cl_abap_elemdescr=>get_t( ).
-              WHEN cl_abap_typedescr=>typekind_string.
-                ls_component-type = cl_abap_elemdescr=>get_string( ).
-              WHEN cl_abap_typedescr=>typekind_xsequence
-                OR cl_abap_typedescr=>typekind_xstring.
-                ls_component-type = cl_abap_elemdescr=>get_xstring( ).
-              WHEN OTHERS.
-                RAISE EXCEPTION TYPE lcx_obj_exception
-                  EXPORTING
-                    iv_text = |Unsupported type_kind { <ls_field_catalog>-type_kind }|.
-            ENDCASE.
 
-            INSERT ls_component INTO TABLE lt_component.
+      create_table_descriptor(
+          EXPORTING
+              it_field_catalog = <ls_table_content>-field_catalog
+            IMPORTING
+              eo_tabledescr = lo_tabledescr ).
 
-          CATCH cx_parameter_invalid_range INTO lx_parameter_invalid_range.
-            RAISE EXCEPTION TYPE lcx_obj_exception
-              EXPORTING
-                iv_text  = |Creation of type_kind { <ls_field_catalog>-type_kind } not possible|
-                previous = lx_parameter_invalid_range.
-        ENDTRY.
-      ENDLOOP.
-
-*    Create a data structure matching the persisted data's table
-      DATA lx_sy_struct_creation TYPE REF TO cx_sy_struct_creation.
-      TRY.
-          lo_structdescr = cl_abap_structdescr=>create( lt_component ).
-        CATCH cx_sy_struct_creation INTO lx_sy_struct_creation.  "
-          RAISE EXCEPTION TYPE lcx_obj_exception
-            EXPORTING
-              iv_text  = lx_sy_struct_creation->get_text( )
-              previous = lx_sy_struct_creation.
-      ENDTRY.
-
-      DATA lx_sy_table_creation TYPE REF TO cx_sy_table_creation.
-      TRY.
-          lo_tabledescr = cl_abap_tabledescr=>create(
-              p_line_type          = lo_structdescr
-              p_table_kind         = cl_abap_tabledescr=>tablekind_std
-          ).
-        CATCH cx_sy_table_creation INTO lx_sy_table_creation.
-          RAISE EXCEPTION TYPE lcx_obj_exception
-            EXPORTING
-              iv_text  = lx_sy_struct_creation->get_text( )
-              previous = lx_sy_struct_creation.
-      ENDTRY.
       CREATE DATA <ls_table_content>-data_tab TYPE HANDLE lo_tabledescr.
 
       ASSIGN <ls_table_content>-data_tab->* TO <lt_data>.
@@ -868,6 +790,237 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
       mo_xml = io_xml.
     ENDIF.
 
+  ENDMETHOD.
+
+
+  METHOD create_table_descriptor.
+
+    DATA lo_structdescr   TYPE REF TO cl_abap_structdescr.
+    DATA lo_tabledescr    TYPE REF TO cl_abap_tabledescr.
+    DATA lt_component     TYPE cl_abap_structdescr=>component_table.
+    DATA ls_component     LIKE LINE OF lt_component.
+    DATA lx_parameter_invalid_range TYPE REF TO cx_parameter_invalid_range.
+    FIELD-SYMBOLS <ls_field_catalog> LIKE LINE OF it_field_catalog.
+
+    CLEAR: ls_component, lt_component, lo_structdescr.
+    LOOP AT it_field_catalog ASSIGNING <ls_field_catalog>.
+      ls_component-name = <ls_field_catalog>-name.
+      TRY.
+          CASE <ls_field_catalog>-type_kind.
+            WHEN    cl_abap_typedescr=>typekind_char
+                OR  cl_abap_typedescr=>typekind_clike
+                OR  cl_abap_typedescr=>typekind_csequence.
+              ls_component-type = cl_abap_elemdescr=>get_c( <ls_field_catalog>-length ).
+            WHEN cl_abap_typedescr=>typekind_date.
+              ls_component-type = cl_abap_elemdescr=>get_d( ).
+            WHEN cl_abap_typedescr=>typekind_decfloat
+            OR  cl_abap_typedescr=>typekind_float.
+              ls_component-type = cl_abap_elemdescr=>get_f( ).
+            WHEN  cl_abap_typedescr=>typekind_decfloat16.
+              ls_component-type = cl_abap_elemdescr=>get_decfloat16( ).
+            WHEN  cl_abap_typedescr=>typekind_decfloat34.
+              ls_component-type = cl_abap_elemdescr=>get_decfloat34( ).
+            WHEN cl_abap_typedescr=>typekind_hex.
+              ls_component-type = cl_abap_elemdescr=>get_x( <ls_field_catalog>-length ).
+            WHEN  cl_abap_typedescr=>typekind_int
+              OR  cl_abap_typedescr=>typekind_int1
+              OR  cl_abap_typedescr=>typekind_int2
+              OR  cl_abap_typedescr=>typekind_simple.
+              ls_component-type = cl_abap_elemdescr=>get_i( ).
+            WHEN  cl_abap_typedescr=>typekind_num
+              OR  cl_abap_typedescr=>typekind_numeric.
+              ls_component-type = cl_abap_elemdescr=>get_n( <ls_field_catalog>-length ).
+            WHEN  cl_abap_typedescr=>typekind_packed.
+              ls_component-type = cl_abap_elemdescr=>get_p(
+                  p_length                   = <ls_field_catalog>-length
+                  p_decimals                 = <ls_field_catalog>-decimals
+              ).
+            WHEN cl_abap_typedescr=>typekind_time.
+              ls_component-type = cl_abap_elemdescr=>get_t( ).
+            WHEN cl_abap_typedescr=>typekind_string.
+              ls_component-type = cl_abap_elemdescr=>get_string( ).
+            WHEN cl_abap_typedescr=>typekind_xsequence
+              OR cl_abap_typedescr=>typekind_xstring.
+              ls_component-type = cl_abap_elemdescr=>get_xstring( ).
+            WHEN OTHERS.
+              RAISE EXCEPTION TYPE lcx_obj_exception
+                EXPORTING
+                  iv_text = |Unsupported type_kind { <ls_field_catalog>-type_kind }|.
+          ENDCASE.
+
+          INSERT ls_component INTO TABLE lt_component.
+
+        CATCH cx_parameter_invalid_range INTO lx_parameter_invalid_range.
+          RAISE EXCEPTION TYPE lcx_obj_exception
+            EXPORTING
+              iv_text  = |Creation of type_kind { <ls_field_catalog>-type_kind } not possible|
+              previous = lx_parameter_invalid_range.
+      ENDTRY.
+    ENDLOOP.
+
+*    Create a data structure matching the persisted data's table
+    DATA lx_sy_struct_creation TYPE REF TO cx_sy_struct_creation.
+    TRY.
+        lo_structdescr = cl_abap_structdescr=>create( lt_component ).
+      CATCH cx_sy_struct_creation INTO lx_sy_struct_creation.  "
+        RAISE EXCEPTION TYPE lcx_obj_exception
+          EXPORTING
+            iv_text  = lx_sy_struct_creation->get_text( )
+            previous = lx_sy_struct_creation.
+    ENDTRY.
+
+    DATA lx_sy_table_creation TYPE REF TO cx_sy_table_creation.
+    TRY.
+        eo_tabledescr = cl_abap_tabledescr=>create(
+            p_line_type          = lo_structdescr
+            p_table_kind         = cl_abap_tabledescr=>tablekind_std
+        ).
+      CATCH cx_sy_table_creation INTO lx_sy_table_creation.
+        RAISE EXCEPTION TYPE lcx_obj_exception
+          EXPORTING
+            iv_text  = lx_sy_struct_creation->get_text( )
+            previous = lx_sy_struct_creation.
+    ENDTRY.
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+CLASS lcl_abapgit_st_container IMPLEMENTATION.
+
+
+
+  METHOD lif_external_object_container~store_obj_table.
+*    sadly, we cannot transform all the DB tables at once,
+*    as references are not supported to be serialized in a simple transformation like
+*    CALL TRANSFORMATION id
+*        SOURCE      objectdatabasecontent = it_table_content
+*        RESULT XML  lo_document_temp.
+*    we need to create a hierarchy of elements manually
+    DATA lo_element_table           TYPE REF TO if_ixml_element.
+    DATA lo_element_table_content   TYPE REF TO if_ixml_element.
+    DATA lo_element_field_catalog   TYPE REF TO if_ixml_element.
+    DATA lo_document_st             TYPE REF TO if_ixml_document.
+    DATA lx_abapgit_object          TYPE REF TO zcx_abapgit_object.
+
+    FIELD-SYMBOLS <lt_data>         TYPE ANY TABLE.
+
+*****    intended structure
+*    <TABLE_NAME> from is_table_content-tabname
+*        <fieldCatalog> serialized  is_table_content-field_catalog <fieldCatalog>
+*        <TableContent> serialized  is_table_content-data_tab->* </TableContent>
+*    </TABLE_NAME>
+    lo_element_table =  mo_xml->xml_element( |{ escape_table_name( is_table_content-tabname ) }| ).
+
+*    field-catalog
+    lo_element_field_catalog = mo_xml->xml_element( co_element_name_field_catalog ).
+    lo_element_table->append_child( lo_element_field_catalog ).
+
+    lo_document_st = cl_ixml=>create( )->create_document( ).
+
+    CALL TRANSFORMATION id
+        SOURCE      field_catalog = is_table_content-field_catalog
+        RESULT XML  lo_document_st.
+
+    lo_element_field_catalog->append_child( lo_document_st->get_root_element( ) ).
+
+*    Table content
+    lo_element_table_content = mo_xml->xml_element( co_element_name_table_content ).
+    lo_element_table->append_child( lo_element_table_content ).
+
+    lo_document_st = cl_ixml=>create( )->create_document( ).
+
+    ASSIGN is_table_content-data_tab->* TO <lt_data>.
+
+    CALL TRANSFORMATION id
+        SOURCE      data_tab = <lt_data>
+        RESULT XML  lo_document_st.
+    lo_element_table_content->append_child( lo_document_st->get_root_element( ) ).
+
+    mo_xml->xml_add( lo_element_table ).
+  ENDMETHOD.
+
+  METHOD lif_external_object_container~get_persisted_table_content.
+    DATA lo_element_table           TYPE REF TO if_ixml_element.
+    DATA lo_element_table_content   TYPE REF TO if_ixml_element.
+    DATA lo_element_field_catalog   TYPE REF TO if_ixml_element.
+    DATA lo_document_st             TYPE REF TO if_ixml_document.
+    DATA lx_abapgit_object          TYPE REF TO zcx_abapgit_object.
+    DATA ls_table_content           LIKE LINE OF et_table_content.
+    DATA lo_tabledescr              TYPE REF TO cl_abap_tabledescr.
+    FIELD-SYMBOLS <lt_data>             TYPE ANY TABLE.
+
+*****    intended structure
+*    <TABLE_NAME> from is_table_content-tabname
+*        <fieldCatalog> serialized  is_table_content-field_catalog <fieldCatalog>
+*        <TableContent> serialized  is_table_content-data_tab->* </TableContent>
+*    </TABLE_NAME>
+
+    LOOP AT it_relevant_table INTO ls_table_content-tabname.
+      CLEAR: ls_table_content-field_catalog, ls_table_content-data_tab.
+      lo_element_table =  mo_xml->xml_find( |{ escape_table_name( ls_table_content-tabname ) }| ).
+      IF lo_element_table IS INITIAL.
+        RAISE EXCEPTION TYPE lcx_obj_exception
+          EXPORTING
+            iv_text = |Table { ls_table_content-tabname } not found in imported file. Corrupted file.|.
+      ENDIF.
+
+*    field-catalog
+      lo_element_field_catalog ?= mo_xml->xml_find( iv_name = co_element_name_field_catalog
+                                                   ii_root = lo_element_table ).
+      IF lo_element_table IS INITIAL.
+        RAISE EXCEPTION TYPE lcx_obj_exception
+          EXPORTING
+            iv_text = |Table { ls_table_content-tabname } has no field-catalog. Corrupted file.|.
+      ENDIF.
+
+
+      lo_document_st = cl_ixml=>create( )->create_document( ).
+      lo_document_st->append_child( lo_element_field_catalog->get_children( )->get_item( 1 ) ).
+
+      CALL TRANSFORMATION id
+        SOURCE XML  lo_document_st
+        RESULT      field_catalog = ls_table_content-field_catalog.
+
+      IF ls_table_content-field_catalog IS INITIAL.
+        RAISE EXCEPTION TYPE lcx_obj_exception
+          EXPORTING
+            iv_text = |Table { ls_table_content-tabname } has no valid field-catalog. Corrupted file.|.
+      ENDIF.
+
+*    Table content
+      lo_element_table_content = mo_xml->xml_find( iv_name = co_element_name_table_content
+                                                   ii_root = lo_element_table ).
+      IF lo_element_table_content IS INITIAL.
+        RAISE EXCEPTION TYPE lcx_obj_exception
+          EXPORTING
+            iv_text = |Table { ls_table_content-tabname } has no content-section. Corrupted file.|.
+      ENDIF.
+
+      create_table_descriptor(
+        EXPORTING
+          it_field_catalog  = ls_table_content-field_catalog
+        IMPORTING
+          eo_tabledescr     = lo_tabledescr
+      ).
+
+      CREATE DATA ls_table_content-data_tab TYPE HANDLE lo_tabledescr.
+      ASSIGN ls_table_content-data_tab->* TO <lt_data>.
+
+      lo_document_st = cl_ixml=>create( )->create_document( ).
+      lo_document_st->append_child( lo_element_table_content->get_children( )->get_item( 1 ) ).
+
+      CALL TRANSFORMATION id
+          SOURCE XML  lo_document_st
+          RESULT      data_tab = <lt_data>.
+
+      INSERT ls_table_content INTO TABLE et_table_content.
+    ENDLOOP.
+  ENDMETHOD.
+
+  METHOD escape_table_name.
+*    replace namespace slashes
+    rv_tabname_escaped = replace( val = iv_tabname  sub = '/'  with = '_-' occ = 0 ). "this is the sequence also used by the ID-transformation
   ENDMETHOD.
 
 ENDCLASS.

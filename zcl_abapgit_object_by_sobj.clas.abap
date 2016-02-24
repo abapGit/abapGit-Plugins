@@ -84,7 +84,7 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
     DATA lo_object_container TYPE REF TO lif_external_object_container.
     DATA lx_obj_exception  TYPE REF TO lcx_obj_exception.
 
-    CREATE OBJECT lo_object_container TYPE lcl_abapgit_xml_container
+    CREATE OBJECT lo_object_container TYPE lcl_abapgit_st_container
       EXPORTING
         io_xml = get_files( )->read_xml( ).
 
@@ -119,13 +119,13 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
 
 
   METHOD zif_abapgit_plugin~serialize.
-    DATA lo_object_container TYPE REF TO lcl_abapgit_xml_container.
+    DATA lo_object_container TYPE REF TO lcl_abapgit_st_container.
     DATA lx_obj_exception  TYPE REF TO lcx_obj_exception.
 
     TRY.
         IF get_tlogo_bridge( )->instance_exists( ) = abap_true.
 
-          CREATE OBJECT lo_object_container TYPE lcl_abapgit_xml_container.
+          CREATE OBJECT lo_object_container.
           get_tlogo_bridge( )->export_object( lo_object_container ).
 
           get_files( )->add_xml( lo_object_container->mo_xml ).

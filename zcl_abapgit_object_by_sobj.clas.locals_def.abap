@@ -20,8 +20,8 @@ INTERFACE lif_external_object_container.
            is_key    TYPE abap_bool,
          END OF ty_s_component,
          ty_t_component TYPE STANDARD TABLE OF ty_s_component WITH KEY primary_key COMPONENTS pos
-                                          WITH UNIQUE SORTED KEY name COMPONENTS name
-                                          WITH NON-UNIQUE SORTED KEY is_key COMPONENTS is_key pos.
+                                WITH UNIQUE SORTED KEY name COMPONENTS name
+                                WITH NON-UNIQUE SORTED KEY is_key COMPONENTS is_key pos.
   TYPES:
     BEGIN OF ty_s_table_content,
       tabname       TYPE tabname,
@@ -37,6 +37,7 @@ INTERFACE lif_external_object_container.
     IMPORTING
               is_table_content TYPE ty_s_table_content
     RAISING   lcx_obj_exception.
+
 
   METHODS get_persisted_table_content
     IMPORTING
@@ -63,6 +64,30 @@ CLASS lcl_abapgit_xml_container DEFINITION.
 
   PROTECTED SECTION.
     CONSTANTS co_suffix_fieldcat TYPE string VALUE '_field_catalog'.
+    METHODS create_table_descriptor
+      importing
+        it_field_catalog TYPE lif_external_object_container=>ty_s_table_content-field_catalog
+      EXPORTING
+        eo_tabledescr    TYPE REF TO cl_abap_tabledescr
+      RAISING
+        lcx_obj_exception.
+ENDCLASS.
+
+
+CLASS lcl_abapgit_st_container DEFINITION INHERITING FROM lcl_abapgit_xml_container .
+  PUBLIC SECTION.
+    methods lif_external_object_container~store_obj_table REDEFINITION.
+    methods lif_external_object_container~get_persisted_table_content REDEFINITION.
+
+  PROTECTED SECTION.
+    CONSTANTS co_element_name_object_tables  TYPE string VALUE 'ObjectDatabaseTables'.
+    CONSTANTS co_element_name_field_catalog  TYPE string VALUE 'FieldCatalog'.
+    CONSTANTS co_element_name_table_content  TYPE string VALUE 'TableContent'.
+
+    methods escape_table_name
+        importing
+            iv_tabname type tabname
+        RETURNING VALUE(rv_tabname_escaped) type tabname.
 ENDCLASS.
 
 CLASS lcl_tlogo_bridge DEFINITION.
@@ -142,7 +167,7 @@ CLASS lcl_tlogo_bridge DEFINITION.
         it_data       TYPE STANDARD TABLE.
   PRIVATE SECTION.
 
-TYPES: BEGIN OF ty_s_objkey ,
+    TYPES: BEGIN OF ty_s_objkey ,
              num   TYPE numc3,
              value TYPE char128,
            END OF ty_s_objkey,
