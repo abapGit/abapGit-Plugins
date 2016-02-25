@@ -10,7 +10,7 @@ CLASS zcl_abapgit_object DEFINITION
         !iv_obj_type TYPE tadir-object
         !iv_obj_name TYPE tadir-obj_name.
 
-    METHODS get_files FINAL
+    METHODS get_files "not FINAL in order to enable unit-testing
       RETURNING
         VALUE(ro_files_proxy) TYPE REF TO zcl_abapgit_files_proxy .
 

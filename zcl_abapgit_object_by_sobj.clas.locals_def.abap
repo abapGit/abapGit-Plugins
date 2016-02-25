@@ -165,6 +165,7 @@ CLASS lcl_tlogo_bridge DEFINITION.
       IMPORTING
         iv_table_name TYPE lif_external_object_container=>ty_s_table_content-tabname
         it_data       TYPE STANDARD TABLE.
+
   PRIVATE SECTION.
 
     TYPES: BEGIN OF ty_s_objkey ,
@@ -186,8 +187,7 @@ CLASS lcl_tlogo_bridge DEFINITION.
         iv_table_name    TYPE lcl_tlogo_bridge=>ty_s_object_table-tobj_name
         iv_where_on_keys TYPE string.
 
-    METHODS is_unittest
-      RETURNING VALUE(rv_is_unittest) TYPE abap_bool.
+
 
     METHODS split_value_to_keys
       IMPORTING

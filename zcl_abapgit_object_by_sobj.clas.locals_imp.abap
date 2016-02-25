@@ -235,25 +235,25 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
 **      ELSE.
 *      as the structure deviate, it's not an option to directly insert from the imported table.
 *      The format needs to be adapted first (even in ABAP, there is no "INSERT INTO CORRESPONDING FIELDS OF dbtab" ;)
-        DATA lr_local_format_tab            TYPE REF TO data.
-        DATA lr_local_format                TYPE REF TO data.
-        FIELD-SYMBOLS <lt_local_format>     TYPE STANDARD TABLE.
-        FIELD-SYMBOLS <ls_local_format>     TYPE any.
-        FIELD-SYMBOLS <ls_imported_format>  TYPE any.
+      DATA lr_local_format_tab            TYPE REF TO data.
+      DATA lr_local_format                TYPE REF TO data.
+      FIELD-SYMBOLS <lt_local_format>     TYPE STANDARD TABLE.
+      FIELD-SYMBOLS <ls_local_format>     TYPE any.
+      FIELD-SYMBOLS <ls_imported_format>  TYPE any.
 
-        CREATE DATA lr_local_format_tab TYPE STANDARD TABLE OF (<ls_imported_table_content>-tabname) WITH DEFAULT KEY.
-        ASSIGN lr_local_format_tab->* TO <lt_local_format>.
+      CREATE DATA lr_local_format_tab TYPE STANDARD TABLE OF (<ls_imported_table_content>-tabname) WITH DEFAULT KEY.
+      ASSIGN lr_local_format_tab->* TO <lt_local_format>.
 
-        CREATE DATA lr_local_format TYPE (<ls_imported_table_content>-tabname).
-        ASSIGN lr_local_format->* TO <ls_local_format>.
+      CREATE DATA lr_local_format TYPE (<ls_imported_table_content>-tabname).
+      ASSIGN lr_local_format->* TO <ls_local_format>.
 
-        LOOP AT <lt_imported_data> ASSIGNING <ls_imported_format>.
-          MOVE-CORRESPONDING <ls_imported_format> TO <ls_local_format>.
-          INSERT <ls_local_format> INTO TABLE <lt_local_format>.
-        ENDLOOP.
+      LOOP AT <lt_imported_data> ASSIGNING <ls_imported_format>.
+        MOVE-CORRESPONDING <ls_imported_format> TO <ls_local_format>.
+        INSERT <ls_local_format> INTO TABLE <lt_local_format>.
+      ENDLOOP.
 
-        do_insert(    iv_table_name = <ls_imported_table_content>-tabname
-                      it_data       = <lt_local_format> ).
+      do_insert(    iv_table_name = <ls_imported_table_content>-tabname
+                    it_data       = <lt_local_format> ).
 **      ENDIF.
     ENDLOOP.
 
@@ -586,17 +586,13 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
 
   METHOD do_insert.
 *  do not operate on the database if executed as part of the unittest.
-    IF is_unittest( ) = abap_false.
       INSERT (iv_table_name) FROM TABLE it_data.
-    ENDIF.
   ENDMETHOD.
 
 
   METHOD do_delete.
 *  do not operate on the database if executed as part of the unittest.
-    IF is_unittest( ) = abap_false.
       DELETE FROM (iv_table_name) WHERE (iv_where_on_keys).
-    ENDIF.
   ENDMETHOD.
 
 
@@ -617,17 +613,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD is_unittest.
 
-    DATA lt_callstack TYPE sys_callst.
-
-    CALL FUNCTION 'SYSTEM_CALLSTACK'
-      IMPORTING
-        et_callstack = lt_callstack.
-
-    READ TABLE lt_callstack TRANSPORTING NO FIELDS WITH KEY progname = 'CL_AUNIT_TEST_CLASS===========CP' ##no_text.
-    rv_is_unittest = boolc( sy-subrc = 0 ).
-  ENDMETHOD.
 
 
 
@@ -974,10 +960,17 @@ CLASS lcl_abapgit_st_container IMPLEMENTATION.
             iv_text = |Table { ls_table_content-tabname } has no field-catalog. Corrupted file.|.
       ENDIF.
 
+      DATA lo_abap_node type ref to if_ixml_element.
+      lo_abap_node ?= lo_element_field_catalog->create_iterator_filtered(
+          depth  = 1    " Iteration Depth, see long text
+          filter = lo_element_field_catalog->create_filter_name_ns(
+                        name      = |abap|
+                        namespace = |http://www.sap.com/abapxml|
+                    )
+      )->get_next( ).
 
       lo_document_st = cl_ixml=>create( )->create_document( ).
-      lo_document_st->append_child( lo_element_field_catalog->get_children( )->get_item( 1 ) ).
-
+      lo_document_st->append_child( lo_abap_node ).
       CALL TRANSFORMATION id
         SOURCE XML  lo_document_st
         RESULT      field_catalog = ls_table_content-field_catalog.
@@ -997,6 +990,14 @@ CLASS lcl_abapgit_st_container IMPLEMENTATION.
             iv_text = |Table { ls_table_content-tabname } has no content-section. Corrupted file.|.
       ENDIF.
 
+      lo_abap_node ?= lo_element_table_content->create_iterator_filtered(
+          depth  = 1    " Iteration Depth, see long text
+          filter = lo_element_table_content->create_filter_name_ns(
+                        name      = |abap|
+                        namespace = |http://www.sap.com/abapxml|
+                    )
+      )->get_next( ).
+
       create_table_descriptor(
         EXPORTING
           it_field_catalog  = ls_table_content-field_catalog
@@ -1008,7 +1009,7 @@ CLASS lcl_abapgit_st_container IMPLEMENTATION.
       ASSIGN ls_table_content-data_tab->* TO <lt_data>.
 
       lo_document_st = cl_ixml=>create( )->create_document( ).
-      lo_document_st->append_child( lo_element_table_content->get_children( )->get_item( 1 ) ).
+      lo_document_st->append_child( lo_abap_node ).
 
       CALL TRANSFORMATION id
           SOURCE XML  lo_document_st
