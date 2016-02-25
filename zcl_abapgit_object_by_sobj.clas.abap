@@ -97,7 +97,7 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
             previous = lx_obj_exception.
     ENDTRY.
 
-    me->create_tadir_entry( iv_package = iv_package ).
+    me->create_tadir_entry( iv_package ).
   ENDMETHOD.
 
 
@@ -114,7 +114,7 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
 
 
   METHOD zif_abapgit_plugin~jump.
-
+    RETURN.
   ENDMETHOD.
 
 

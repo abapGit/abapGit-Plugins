@@ -94,13 +94,13 @@ CLASS ZCL_ABAPGIT_FILES_PROXY IMPLEMENTATION.
 
 
   METHOD constructor.
-*    This class acts as proxy for the local implementation of lcl_files_objects in ZABAPGIT.
-*    It provides plugins a typed API without duplicating the implementation
+* This class acts as proxy for the local implementation of lcl_files_objects in ZABAPGIT.
+* It provides plugins a typed API without duplicating the implementation
 
 * delegate all the method calls to the proxied object.
-*  potential optimization ( minor priority): Implement a generic RTTI-based
-*  method call generation so that interface changes would have to be done to the
-*  definition of this class only
+* potential optimization ( minor priority): Implement a generic RTTI-based
+* method call generation so that interface changes would have to be done to the
+* definition of this class only
     mo_objects_files = io_objects_files.
   ENDMETHOD.
 

@@ -105,7 +105,7 @@ CLASS ZCL_ABAPGIT_XML_PROXY IMPLEMENTATION.
             EXPORTING
               iv_empty = iv_empty.
         ENDIF.
-      CATCH cx_root INTO lx_root.
+      CATCH cx_root INTO lx_root ##CATCH_ALL.
         RAISE EXCEPTION TYPE zcx_abapgit_object
           EXPORTING
             iv_text  = lx_root->get_text( )

@@ -14,11 +14,11 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
 * get the TLOGO properties as stored in transaction SOBJ
 
 * object header
-    SELECT SINGLE * FROM objh INTO mv_object_header
+    SELECT SINGLE * FROM objh INTO ms_object_header
       WHERE objectname = mv_object
       AND   objecttype = co_logical_transport_object.
 
-    IF mv_object_header IS INITIAL.
+    IF ms_object_header IS INITIAL.
       RAISE EXCEPTION TYPE lcx_obj_exception
         EXPORTING
           iv_text = |Unsupported object-type { mv_object }|.
@@ -69,7 +69,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
             iv_text = |Structure of { <ls_object_table>-tobj_name } corrupt|.
       ENDIF.
 
-      lt_included_view = lo_structdescr->get_included_view( p_level = 1000 ). "There should not be more inclusion-levels than that - even in ERP
+      lt_included_view = lo_structdescr->get_included_view( 1000 ). "There should not be more inclusion-levels than that - even in ERP
       CLEAR <ls_object_table>-field_catalog.
 
       DATA lv_pos LIKE ls_field_cat_comp-pos.
@@ -267,7 +267,6 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
     DATA lt_cts_object_entry    TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY.
     DATA ls_cts_object_entry    LIKE LINE OF lt_cts_object_entry.
     DATA lt_cts_key             TYPE STANDARD TABLE OF e071k WITH DEFAULT KEY.
-    DATA ls_cts_key             LIKE LINE OF lt_cts_key.
     DATA lv_client              TYPE trclient.
 
     lv_client = sy-mandt.
@@ -363,8 +362,6 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
     DATA ls_objkey                    LIKE LINE OF lt_objkey.
     DATA lv_non_value_pos             TYPE numc3.
     DATA lt_key_component             LIKE <ls_object_table>-field_catalog.
-    DATA lt_key_component_uncovered   LIKE <ls_object_table>-field_catalog.
-    DATA ls_key_component_uncovered   LIKE LINE OF lt_key_component_uncovered.
     DATA ls_fieldcat_component        LIKE LINE OF lt_key_component.
 
     CLEAR lt_key_component.
@@ -586,13 +583,13 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
 
   METHOD do_insert.
 *  do not operate on the database if executed as part of the unittest.
-      INSERT (iv_table_name) FROM TABLE it_data.
+    INSERT (iv_table_name) FROM TABLE it_data.
   ENDMETHOD.
 
 
   METHOD do_delete.
 *  do not operate on the database if executed as part of the unittest.
-      DELETE FROM (iv_table_name) WHERE (iv_where_on_keys).
+    DELETE FROM (iv_table_name) WHERE (iv_where_on_keys).
   ENDMETHOD.
 
 
@@ -611,12 +608,6 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
   ENDMETHOD.
-
-
-
-
-
-
 
   METHOD split_value_to_keys.
 
@@ -782,7 +773,6 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
   METHOD create_table_descriptor.
 
     DATA lo_structdescr   TYPE REF TO cl_abap_structdescr.
-    DATA lo_tabledescr    TYPE REF TO cl_abap_tabledescr.
     DATA lt_component     TYPE cl_abap_structdescr=>component_table.
     DATA ls_component     LIKE LINE OF lt_component.
     DATA lx_parameter_invalid_range TYPE REF TO cx_parameter_invalid_range.
@@ -887,7 +877,6 @@ CLASS lcl_abapgit_st_container IMPLEMENTATION.
     DATA lo_element_table_content   TYPE REF TO if_ixml_element.
     DATA lo_element_field_catalog   TYPE REF TO if_ixml_element.
     DATA lo_document_st             TYPE REF TO if_ixml_document.
-    DATA lx_abapgit_object          TYPE REF TO zcx_abapgit_object.
 
     FIELD-SYMBOLS <lt_data>         TYPE ANY TABLE.
 
@@ -931,7 +920,6 @@ CLASS lcl_abapgit_st_container IMPLEMENTATION.
     DATA lo_element_table_content   TYPE REF TO if_ixml_element.
     DATA lo_element_field_catalog   TYPE REF TO if_ixml_element.
     DATA lo_document_st             TYPE REF TO if_ixml_document.
-    DATA lx_abapgit_object          TYPE REF TO zcx_abapgit_object.
     DATA ls_table_content           LIKE LINE OF et_table_content.
     DATA lo_tabledescr              TYPE REF TO cl_abap_tabledescr.
     FIELD-SYMBOLS <lt_data>             TYPE ANY TABLE.
@@ -960,7 +948,7 @@ CLASS lcl_abapgit_st_container IMPLEMENTATION.
             iv_text = |Table { ls_table_content-tabname } has no field-catalog. Corrupted file.|.
       ENDIF.
 
-      DATA lo_abap_node type ref to if_ixml_element.
+      DATA lo_abap_node TYPE REF TO if_ixml_element.
       lo_abap_node ?= lo_element_field_catalog->create_iterator_filtered(
           depth  = 1    " Iteration Depth, see long text
           filter = lo_element_field_catalog->create_filter_name_ns(

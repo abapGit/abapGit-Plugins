@@ -20,7 +20,6 @@ CLASS lcl_test_bridge IMPLEMENTATION.
 
   METHOD constructor.
     super->constructor(
-      EXPORTING
         iv_object         = iv_object
         iv_object_name    = iv_object_name
     ).
@@ -171,7 +170,6 @@ CLASS ltcl_bobf IMPLEMENTATION.
     super->constructor( ).
 
     me->set_item(
-      EXPORTING
         iv_obj_type = 'BOBF'
         iv_obj_name = 'ZABAPGIT_UNITTEST'
     ).
@@ -185,7 +183,6 @@ CLASS ltcl_bobf IMPLEMENTATION.
             iv_object_name = 'ZABAPGIT_UNITTEST'.
       CATCH cx_root.
         cl_aunit_assert=>fail(
-          EXPORTING
             msg    = 'BOPF not available in this system. Test cannot be executed'
             level  = cl_aunit_assert=>tolerable
             quit   = cl_aunit_assert=>class
@@ -424,7 +421,7 @@ CLASS ltcl_bobf IMPLEMENTATION.
     CREATE OBJECT lo_st_container.
     go_bridge->export_object( lo_st_container ).
 
-    lv_xml_string = lo_st_container->mo_xml->xml_render(  iv_normalize = abap_false ).
+    lv_xml_string = lo_st_container->mo_xml->xml_render( abap_false ).
 
 *    we should not compare the complete string, as the root element contains e. g. the encoding and version.
 *    start with the first _- which is the escaped slash of the first BOPF table
@@ -441,7 +438,6 @@ CLASS ltcl_bobf IMPLEMENTATION.
 
     DATA lt_modification TYPE /bobf/t_frw_modification.
     DATA ls_modification LIKE LINE OF lt_modification.
-    DATA lx_frw          TYPE REF TO cx_root.
 
     ls_modification-node            = gv_root_node_key.
     ls_modification-change_mode     = /bobf/if_frw_c=>sc_modify_create.
@@ -449,8 +445,7 @@ CLASS ltcl_bobf IMPLEMENTATION.
     INSERT ls_modification INTO TABLE lt_modification.
 
     lo_mo_serv_mgr->modify(
-      EXPORTING
-        it_modification = lt_modification    " Changes
+        lt_modification    " Changes
     ).
 
     DATA lt_key TYPE /bobf/t_frw_key.

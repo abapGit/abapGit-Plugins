@@ -27,9 +27,9 @@ INTERFACE lif_external_object_container.
       tabname       TYPE tabname,
       field_catalog TYPE ty_t_component,
       data_tab      TYPE REF TO data,
-    END OF ty_s_table_content .
+    END OF ty_s_table_content.
   TYPES:
-    ty_t_table_content TYPE SORTED TABLE OF ty_s_table_content WITH UNIQUE KEY tabname .
+    ty_t_table_content TYPE SORTED TABLE OF ty_s_table_content WITH UNIQUE KEY tabname.
 
   TYPES ty_t_tabname TYPE SORTED TABLE OF tabname WITH UNIQUE KEY table_line.
 
@@ -65,7 +65,7 @@ CLASS lcl_abapgit_xml_container DEFINITION.
   PROTECTED SECTION.
     CONSTANTS co_suffix_fieldcat TYPE string VALUE '_field_catalog'.
     METHODS create_table_descriptor
-      importing
+      IMPORTING
         it_field_catalog TYPE lif_external_object_container=>ty_s_table_content-field_catalog
       EXPORTING
         eo_tabledescr    TYPE REF TO cl_abap_tabledescr
@@ -74,20 +74,20 @@ CLASS lcl_abapgit_xml_container DEFINITION.
 ENDCLASS.
 
 
-CLASS lcl_abapgit_st_container DEFINITION INHERITING FROM lcl_abapgit_xml_container .
+CLASS lcl_abapgit_st_container DEFINITION INHERITING FROM lcl_abapgit_xml_container.
   PUBLIC SECTION.
-    methods lif_external_object_container~store_obj_table REDEFINITION.
-    methods lif_external_object_container~get_persisted_table_content REDEFINITION.
+    METHODS lif_external_object_container~store_obj_table REDEFINITION.
+    METHODS lif_external_object_container~get_persisted_table_content REDEFINITION.
 
   PROTECTED SECTION.
     CONSTANTS co_element_name_object_tables  TYPE string VALUE 'ObjectDatabaseTables'.
     CONSTANTS co_element_name_field_catalog  TYPE string VALUE 'FieldCatalog'.
     CONSTANTS co_element_name_table_content  TYPE string VALUE 'TableContent'.
 
-    methods escape_table_name
-        importing
-            iv_tabname type tabname
-        RETURNING VALUE(rv_tabname_escaped) type tabname.
+    METHODS escape_table_name
+      IMPORTING
+                iv_tabname                TYPE tabname
+      RETURNING VALUE(rv_tabname_escaped) TYPE tabname.
 ENDCLASS.
 
 CLASS lcl_tlogo_bridge DEFINITION.
@@ -135,7 +135,7 @@ CLASS lcl_tlogo_bridge DEFINITION.
 
     DATA mv_object                      TYPE objh-objectname. "This is the name of the SOBJ-object (M1) which is the type of all objects derived from it
     DATA mv_object_name                 TYPE sobj_name.
-    DATA mv_object_header               TYPE objh.
+    DATA ms_object_header               TYPE objh.
     DATA mt_object_table                TYPE ty_t_object_table.
     DATA mt_object_method               TYPE ty_t_object_method.
     DATA mv_tolerate_additional_tables  TYPE abap_bool.
@@ -168,7 +168,7 @@ CLASS lcl_tlogo_bridge DEFINITION.
 
   PRIVATE SECTION.
 
-    TYPES: BEGIN OF ty_s_objkey ,
+    TYPES: BEGIN OF ty_s_objkey,
              num   TYPE numc3,
              value TYPE char128,
            END OF ty_s_objkey,
