@@ -47,6 +47,7 @@ CLASS zcl_abapgit_files_proxy DEFINITION
       set_files
         IMPORTING it_files TYPE ty_files_tt.
 
+PROTECTED SECTION.
   PRIVATE SECTION.
 
     DATA: mo_objects_files TYPE REF TO object.
