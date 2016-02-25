@@ -158,10 +158,11 @@ CLASS ltcl_bobf DEFINITION FINAL FOR TESTING
       t200_delete_object        FOR TESTING RAISING cx_static_check.
 
     METHODS get_bobf_container
-      RETURNING VALUE(ro_container) TYPE REF TO lif_external_object_container.
+      RETURNING VALUE(ro_container) TYPE REF TO lif_external_object_container
+      RAISING   cx_static_check.
 
-      methods get_bopf_persisted_string
-        RETURNING VALUE(rv_xml) type string.
+    METHODS get_bopf_persisted_string
+      RETURNING VALUE(rv_xml) TYPE string.
 ENDCLASS.
 
 
@@ -177,11 +178,19 @@ CLASS ltcl_bobf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD class_setup.
-    CREATE OBJECT go_bridge
-      EXPORTING
-        iv_object      = 'BOBF'
-        iv_object_name = 'ZABAPGIT_UNITTEST'.
-
+    TRY.
+        CREATE OBJECT go_bridge
+          EXPORTING
+            iv_object      = 'BOBF'
+            iv_object_name = 'ZABAPGIT_UNITTEST'.
+      CATCH cx_root.
+        cl_aunit_assert=>fail(
+          EXPORTING
+            msg    = 'BOPF not available in this system. Test cannot be executed'
+            level  = cl_aunit_assert=>tolerable
+            quit   = cl_aunit_assert=>class
+        ).
+    ENDTRY.
 *    purge existing object if it exists from previous execution
     go_bridge->delete_object_on_db( ).
 
@@ -511,9 +520,9 @@ CLASS ltcl_bobf IMPLEMENTATION.
       EXPORTING
         io_xml = me->create_xml( iv_xml = me->get_bopf_persisted_string( ) ).
 
-  endmethod.
+  ENDMETHOD.
 
-  method get_bopf_persisted_string.
+  METHOD get_bopf_persisted_string.
 
     rv_xml = rv_xml && |<?xml version="1.0" encoding="utf-8"?><abapGit version="v0.2-alpha"><_-BOBF_-ACT_CONF>|.
     rv_xml = rv_xml && |<FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
