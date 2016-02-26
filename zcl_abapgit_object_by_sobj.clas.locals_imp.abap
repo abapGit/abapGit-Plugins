@@ -296,37 +296,33 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
   METHOD after_import.
 *  this method re-uses the BW-function-module for executing the After-Import-methods
 
-    DATA lt_log TYPE rs_t_tr_prot.
     DATA lt_cts_object_entry    TYPE STANDARD TABLE OF e071 WITH DEFAULT KEY.
     DATA ls_cts_object_entry    LIKE LINE OF lt_cts_object_entry.
     DATA lt_cts_key             TYPE STANDARD TABLE OF e071k WITH DEFAULT KEY.
-    DATA ls_msg     TYPE rs_s_msg.
 
-    FIELD-SYMBOLS <ls_log> LIKE LINE OF lt_log.
+    FIELD-SYMBOLS <ls_object_method> LIKE LINE OF mt_object_method.
 
     ls_cts_object_entry-pgmid  = rs_c_pgmid_r3tr.
     ls_cts_object_entry-object = mv_object.
     ls_cts_object_entry-obj_name = mv_object_name.
     INSERT ls_cts_object_entry INTO TABLE lt_cts_object_entry.
 
-    CALL FUNCTION 'RS_AFTER_IMPORT'
-      EXPORTING
-        i_mode      = rs_c_after_import_mode-activate
-      IMPORTING
-        e_t_tr_prot = lt_log
-      TABLES
-        tt_e071     = lt_cts_object_entry
-        tt_e071k    = lt_cts_key.
+    READ TABLE mt_object_method ASSIGNING <ls_object_method>
+      WITH TABLE KEY
+        objectname = mv_object
+        objecttype = 'L' ##no_text
+        method = 'AFTER_IMP' ##no_text.
 
-    LOOP AT lt_log ASSIGNING <ls_log>.
-      ls_msg-msgid = <ls_log>-ag.
-      ls_msg-msgno = <ls_log>-msgnr.
-      ls_msg-msgv1 = <ls_log>-var1.
-      ls_msg-msgv2 = <ls_log>-var2.
-      ls_msg-msgv3 = <ls_log>-var3.
-      ls_msg-msgv4 = <ls_log>-var4.
-      cl_rso_application_log=>if_rso_application_log~add_message_as_structure( ls_msg ).
-    ENDLOOP.
+    IF sy-subrc = 0.
+      CALL FUNCTION <ls_object_method>-methodname
+        EXPORTING
+          IV_TARCLIENT  = sy-mandt "this is actually optional for most AIM, but let's supply it and hope that those client-independent-ones just ignore it
+          iv_is_upgrade = abap_false
+        TABLES
+          tt_e071       = lt_cts_object_entry
+          tt_e071k      = lt_cts_key.
+    ENDIF.
+
   ENDMETHOD.
 
 
