@@ -543,6 +543,11 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
     ev_is_identical = abap_true.
     LOOP AT it_local_fieldcatalog INTO ls_local_field_def.
       READ TABLE it_imported_fieldcatalog INTO ls_imported_field_def WITH KEY name COMPONENTS name = ls_local_field_def-name.
+
+*      The position of the attribute is not relevant with respect to comparison
+      CLEAR: ls_imported_field_def-pos,
+             ls_local_field_def-pos.
+
       IF sy-subrc <> 0.
         ev_is_identical = abap_false.
         IF mv_tolerate_deviating_fields = abap_true.
