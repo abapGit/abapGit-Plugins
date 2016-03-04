@@ -1,19 +1,29 @@
-interface ZIF_ABAPGIT_PLUGIN
-  public .
+INTERFACE zif_abapgit_plugin
+  PUBLIC .
 
+  TYPES: BEGIN OF ty_metadata,
+           BEGIN OF serializer,
+             class   TYPE string,
+             version TYPE string,
+           END OF serializer,
+           master_language LIKE sy-langu,
+         END OF ty_metadata.
 
-  methods SERIALIZE RAISING zcx_abapgit_object.
+  METHODS serialize RAISING zcx_abapgit_object.
 
-  methods DESERIALIZE
-    importing
-      !IV_PACKAGE type DEVCLASS
-    RAISING zcx_abapgit_object.
+  METHODS deserialize
+    IMPORTING
+              !iv_package TYPE devclass
+    RAISING   zcx_abapgit_object.
 
-  methods DELETE RAISING zcx_abapgit_object.
+  METHODS delete RAISING zcx_abapgit_object.
 
-  methods EXISTS
-    returning
-      value(RV_BOOL) type ABAP_BOOL .
+  METHODS exists
+    RETURNING
+      VALUE(rv_bool) TYPE abap_bool .
 
-  methods JUMP .
-endinterface.
+  METHODS jump .
+
+  METHODS get_metadata
+    RETURNING VALUE(rs_metadata) TYPE ty_metadata.
+ENDINTERFACE.
