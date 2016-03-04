@@ -349,42 +349,58 @@ CLASS ltcl_bobf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD class_teardown.
+    DATA lv_deleted TYPE abap_bool.
 
     CALL FUNCTION 'DDIF_OBJECT_DELETE'
       EXPORTING
         type          = 'TTYP'    " Type of ABAP Dictionary object to be deleted
         name          = 'ZAGUT_T_ROOT'    " Name of ABAP Dictionary object to be deleted
+      IMPORTING
+        deleted       = lv_deleted
       EXCEPTIONS
         illegal_input = 1
         no_authority  = 2
         OTHERS        = 3.
+    cl_abap_unit_assert=>assert_not_initial( lv_deleted ).
+
 
     CALL FUNCTION 'DDIF_OBJECT_DELETE'
       EXPORTING
         type          = 'TABL'    " Type of ABAP Dictionary object to be deleted
         name          = 'ZAGUT_S_ROOT'    " Name of ABAP Dictionary object to be deleted
+      IMPORTING
+        deleted       = lv_deleted
       EXCEPTIONS
         illegal_input = 1
         no_authority  = 2
         OTHERS        = 3.
+    cl_abap_unit_assert=>assert_not_initial( lv_deleted ).
+
 
     CALL FUNCTION 'DDIF_OBJECT_DELETE'
       EXPORTING
         type          = 'TABL'    " Type of ABAP Dictionary object to be deleted
         name          = 'ZAGUT_D_ROOT'    " Name of ABAP Dictionary object to be deleted
+      IMPORTING
+        deleted       = lv_deleted
       EXCEPTIONS
         illegal_input = 1
         no_authority  = 2
         OTHERS        = 3.
+    cl_abap_unit_assert=>assert_not_initial( lv_deleted ).
+
 
     CALL FUNCTION 'DDIF_OBJECT_DELETE'
       EXPORTING
         type          = 'TABL'    " Type of ABAP Dictionary object to be deleted
         name          = 'ZAGUT_S_ROOT_D'    " Name of ABAP Dictionary object to be deleted
+      IMPORTING
+        deleted       = lv_deleted
       EXCEPTIONS
         illegal_input = 1
         no_authority  = 2
         OTHERS        = 3.
+    cl_abap_unit_assert=>assert_not_initial( lv_deleted ).
 
   ENDMETHOD.
 
