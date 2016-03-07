@@ -33,6 +33,9 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
     DATA lv_objectname      LIKE LINE OF lt_all_objectname.
     DATA lv_obj_type        LIKE LINE OF gt_supported_obj_types.
 
+    gv_serializer_classname = 'ZCL_ABAPGIT_OBJECT_BY_SOBJ'.
+    gv_serializer_version   = '1.0'.
+
     SELECT objectname FROM objh INTO TABLE lt_all_objectname
            WHERE objecttype = 'L'.
 
@@ -110,6 +113,11 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
       CATCH lcx_obj_exception INTO lx_obj_exception.
         rv_bool = abap_false.
     ENDTRY.
+  ENDMETHOD.
+
+
+  METHOD zif_abapgit_plugin~get_metadata.
+    rs_metadata = get_metadata( ).
   ENDMETHOD.
 
 

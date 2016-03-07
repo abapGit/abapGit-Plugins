@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+ <asx:values>
+  <METADATA>
+   <SERIALIZER>
+    <CLASS>\PROGRAM=ZABAPGIT\CLASS=LCL_OBJECT_CLAS</CLASS>
+    <VERSION>v0.113</VERSION>
+   </SERIALIZER>
+   <MASTER_LANGUAGE>E</MASTER_LANGUAGE>
+  </METADATA>
+ </asx:values>
+</asx:abap>

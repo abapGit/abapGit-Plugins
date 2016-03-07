@@ -5,7 +5,7 @@ CLASS zcl_abapgit_object DEFINITION
 
   PUBLIC SECTION.
 
-    methods set_item
+    METHODS set_item
       IMPORTING
         !iv_obj_type TYPE tadir-object
         !iv_obj_name TYPE tadir-obj_name.
@@ -29,6 +29,9 @@ CLASS zcl_abapgit_object DEFINITION
       RETURNING VALUE(rt_obj_type) TYPE objtyptable.
 
   PROTECTED SECTION.
+    CLASS-DATA   gv_serializer_classname TYPE string.
+    CLASS-DATA   gv_serializer_version   TYPE string.
+
     DATA mv_obj_type TYPE tadir-object.
     DATA mv_obj_name TYPE tadir-obj_name .
 
@@ -41,6 +44,9 @@ CLASS zcl_abapgit_object DEFINITION
     METHODS delete_tadir_entry
       RAISING
         zcx_abapgit_object.
+
+    METHODS get_metadata
+      RETURNING VALUE(rs_metadata) TYPE zif_abapgit_plugin=>ty_metadata.
 
   PRIVATE SECTION.
     DATA mo_files_proxy TYPE REF TO zcl_abapgit_files_proxy .
@@ -132,6 +138,23 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
 
   METHOD get_files.
     ro_files_proxy = mo_files_proxy.
+  ENDMETHOD.
+
+
+  METHOD get_metadata.
+    ASSERT gv_serializer_classname IS NOT INITIAL. "needs to be provided in class-constructor of the inheriting class
+    rs_metadata-serializer-class = gv_serializer_classname.
+    rs_metadata-serializer-version = gv_serializer_version. "optional
+
+*  this method must only be called after set_item
+    ASSERT mv_obj_name IS NOT INITIAL.
+    ASSERT mv_obj_type IS NOT INITIAL.
+
+    SELECT SINGLE masterlang FROM tadir INTO rs_metadata-master_language
+        WHERE   pgmid       = 'R3TR'
+            AND object      = mv_obj_type
+            AND obj_name    = mv_obj_name.
+
   ENDMETHOD.
 
 
