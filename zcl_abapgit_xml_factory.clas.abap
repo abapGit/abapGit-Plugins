@@ -24,6 +24,8 @@ CLASS zcl_abapgit_xml_factory DEFINITION
     CLASS-METHODS create_xml_output
       RETURNING VALUE(ro_xml_proxy) TYPE REF TO zif_abapgit_xml_output
       RAISING   zcx_abapgit_object.
+PROTECTED SECTION.
+PRIVATE SECTION.
 ENDCLASS.
 
 
