@@ -667,11 +667,12 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
 
     ASSIGN is_table_content-data_tab->* TO <lt_data>.
     TRY.
-        mo_xml->table_add(  it_table           = <lt_data>
-                            iv_name            = |{ is_table_content-tabname }| ).
+        mo_xml_output->add( iv_name            = |{ is_table_content-tabname }|
+                            ig_data            = <lt_data> ).
 
-        mo_xml->table_add(  it_table           = is_table_content-field_catalog
-                            iv_name            = |{ is_table_content-tabname }{ co_suffix_fieldcat }| ).
+        mo_xml_output->add( iv_name            = |{ is_table_content-tabname }{ co_suffix_fieldcat }|
+                            ig_data            = is_table_content-field_catalog ).
+
       CATCH zcx_abapgit_object INTO lx_abapgit_object.
         RAISE EXCEPTION TYPE lcx_obj_exception
           EXPORTING
@@ -696,12 +697,12 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
 * with which it has been serialized
       TRY.
 
-          mo_xml->table_read(
-               EXPORTING
-                 iv_name            = |{ <ls_table_content>-tabname }{ co_suffix_fieldcat }|
-                 CHANGING
-                   ct_table           = <ls_table_content>-field_catalog
-               ).
+          mo_xml_input->read(
+            EXPORTING
+              iv_name            = |{ <ls_table_content>-tabname }{ co_suffix_fieldcat }|
+            CHANGING
+              cg_data            = <ls_table_content>-field_catalog
+          ).
         CATCH zcx_abapgit_object INTO lx_abapgit_object.
           RAISE EXCEPTION TYPE lcx_obj_exception
             EXPORTING
@@ -729,11 +730,11 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
 
 *    Read the persisted data
       TRY.
-          mo_xml->table_read(
+          mo_xml_input->read(
           EXPORTING
             iv_name            = |{ <ls_table_content>-tabname }|
             CHANGING
-              ct_table           = <lt_data> ).
+              cg_data          = <lt_data> ).
 
 
         CATCH zcx_abapgit_object INTO lx_abapgit_object.
@@ -754,22 +755,6 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
 *    Idea: create a new file containing the backup.
 *    Open: How to properly inject the files-object
   ENDMETHOD.
-
-  METHOD constructor.
-
-    IF io_xml IS INITIAL.
-      TRY.
-          mo_xml = zcl_abapgit_xml_proxy=>create( ).
-        CATCH zcx_abapgit_object.  "
-          ASSERT 1 = 0.
-*           If this fails, ABAPGit XML has a serious issue and should not be processed further.
-      ENDTRY.
-    ELSE.
-      mo_xml = io_xml.
-    ENDIF.
-
-  ENDMETHOD.
-
 
   METHOD create_table_descriptor.
 
@@ -861,156 +846,12 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
 
   ENDMETHOD.
 
-ENDCLASS.
-
-CLASS lcl_abapgit_st_container IMPLEMENTATION.
-
-
-
-  METHOD lif_external_object_container~store_obj_table.
-*    sadly, we cannot transform all the DB tables at once,
-*    as references are not supported to be serialized in a simple transformation like
-*    CALL TRANSFORMATION id
-*        SOURCE      objectdatabasecontent = it_table_content
-*        RESULT XML  lo_document_temp.
-*    we need to create a hierarchy of elements manually
-    DATA lo_element_table           TYPE REF TO if_ixml_element.
-    DATA lo_element_table_content   TYPE REF TO if_ixml_element.
-    DATA lo_element_field_catalog   TYPE REF TO if_ixml_element.
-    DATA lo_document_st             TYPE REF TO if_ixml_document.
-
-    FIELD-SYMBOLS <lt_data>         TYPE ANY TABLE.
-
-*****    intended structure
-*    <TABLE_NAME> from is_table_content-tabname
-*        <fieldCatalog> serialized  is_table_content-field_catalog <fieldCatalog>
-*        <TableContent> serialized  is_table_content-data_tab->* </TableContent>
-*    </TABLE_NAME>
-    lo_element_table =  mo_xml->xml_element( |{ escape_table_name( is_table_content-tabname ) }| ).
-
-*    field-catalog
-    lo_element_field_catalog = mo_xml->xml_element( co_element_name_field_catalog ).
-    lo_element_table->append_child( lo_element_field_catalog ).
-
-    lo_document_st = cl_ixml=>create( )->create_document( ).
-
-    CALL TRANSFORMATION id
-        SOURCE      field_catalog = is_table_content-field_catalog
-        RESULT XML  lo_document_st.
-
-    lo_element_field_catalog->append_child( lo_document_st->get_root_element( ) ).
-
-*    Table content
-    lo_element_table_content = mo_xml->xml_element( co_element_name_table_content ).
-    lo_element_table->append_child( lo_element_table_content ).
-
-    lo_document_st = cl_ixml=>create( )->create_document( ).
-
-    ASSIGN is_table_content-data_tab->* TO <lt_data>.
-
-    CALL TRANSFORMATION id
-        SOURCE      data_tab = <lt_data>
-        RESULT XML  lo_document_st.
-    lo_element_table_content->append_child( lo_document_st->get_root_element( ) ).
-
-    mo_xml->xml_add( lo_element_table ).
+  METHOD set_xml_input.
+    mo_xml_input = io_xml.
   ENDMETHOD.
 
-  METHOD lif_external_object_container~get_persisted_table_content.
-    DATA lo_element_table           TYPE REF TO if_ixml_element.
-    DATA lo_element_table_content   TYPE REF TO if_ixml_element.
-    DATA lo_element_field_catalog   TYPE REF TO if_ixml_element.
-    DATA lo_document_st             TYPE REF TO if_ixml_document.
-    DATA ls_table_content           LIKE LINE OF et_table_content.
-    DATA lo_tabledescr              TYPE REF TO cl_abap_tabledescr.
-    FIELD-SYMBOLS <lt_data>             TYPE ANY TABLE.
-
-*****    intended structure
-*    <TABLE_NAME> from is_table_content-tabname
-*        <fieldCatalog> serialized  is_table_content-field_catalog <fieldCatalog>
-*        <TableContent> serialized  is_table_content-data_tab->* </TableContent>
-*    </TABLE_NAME>
-
-    LOOP AT it_relevant_table INTO ls_table_content-tabname.
-      CLEAR: ls_table_content-field_catalog, ls_table_content-data_tab.
-      lo_element_table =  mo_xml->xml_find( |{ escape_table_name( ls_table_content-tabname ) }| ).
-      IF lo_element_table IS INITIAL.
-        RAISE EXCEPTION TYPE lcx_obj_exception
-          EXPORTING
-            iv_text = |Table { ls_table_content-tabname } not found in imported file. Corrupted file.|.
-      ENDIF.
-
-*    field-catalog
-      lo_element_field_catalog ?= mo_xml->xml_find( iv_name = co_element_name_field_catalog
-                                                   ii_root = lo_element_table ).
-      IF lo_element_table IS INITIAL.
-        RAISE EXCEPTION TYPE lcx_obj_exception
-          EXPORTING
-            iv_text = |Table { ls_table_content-tabname } has no field-catalog. Corrupted file.|.
-      ENDIF.
-
-      DATA lo_abap_node TYPE REF TO if_ixml_element.
-      lo_abap_node ?= lo_element_field_catalog->create_iterator_filtered(
-          depth  = 1    " Iteration Depth, see long text
-          filter = lo_element_field_catalog->create_filter_name_ns(
-                        name      = |abap|
-                        namespace = |http://www.sap.com/abapxml|
-                    )
-      )->get_next( ).
-
-      lo_document_st = cl_ixml=>create( )->create_document( ).
-      lo_document_st->append_child( lo_abap_node ).
-      CALL TRANSFORMATION id
-        SOURCE XML  lo_document_st
-        RESULT      field_catalog = ls_table_content-field_catalog.
-
-      IF ls_table_content-field_catalog IS INITIAL.
-        RAISE EXCEPTION TYPE lcx_obj_exception
-          EXPORTING
-            iv_text = |Table { ls_table_content-tabname } has no valid field-catalog. Corrupted file.|.
-      ENDIF.
-
-*    Table content
-      lo_element_table_content = mo_xml->xml_find( iv_name = co_element_name_table_content
-                                                   ii_root = lo_element_table ).
-      IF lo_element_table_content IS INITIAL.
-        RAISE EXCEPTION TYPE lcx_obj_exception
-          EXPORTING
-            iv_text = |Table { ls_table_content-tabname } has no content-section. Corrupted file.|.
-      ENDIF.
-
-      lo_abap_node ?= lo_element_table_content->create_iterator_filtered(
-          depth  = 1    " Iteration Depth, see long text
-          filter = lo_element_table_content->create_filter_name_ns(
-                        name      = |abap|
-                        namespace = |http://www.sap.com/abapxml|
-                    )
-      )->get_next( ).
-
-      create_table_descriptor(
-        EXPORTING
-          it_field_catalog  = ls_table_content-field_catalog
-        IMPORTING
-          eo_tabledescr     = lo_tabledescr
-      ).
-
-      CREATE DATA ls_table_content-data_tab TYPE HANDLE lo_tabledescr.
-      ASSIGN ls_table_content-data_tab->* TO <lt_data>.
-
-      lo_document_st = cl_ixml=>create( )->create_document( ).
-      lo_document_st->append_child( lo_abap_node ).
-
-      CALL TRANSFORMATION id
-          SOURCE XML  lo_document_st
-          RESULT      data_tab = <lt_data>.
-
-      INSERT ls_table_content INTO TABLE et_table_content.
-    ENDLOOP.
-  ENDMETHOD.
-
-  METHOD escape_table_name.
-*    replace namespace slashes
-    rv_tabname_escaped = replace( val = iv_tabname  sub = '/'  with = '_-' occ = 0 ). "this is the sequence also used by the ID-transformation
+  METHOD set_xml_output.
+    mo_xml_output = io_xml.
   ENDMETHOD.
 
 ENDCLASS.

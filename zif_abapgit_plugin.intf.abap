@@ -1,19 +1,20 @@
 INTERFACE zif_abapgit_plugin
   PUBLIC .
 
-  TYPES: BEGIN OF ty_metadata,
-           BEGIN OF serializer,
-             class   TYPE string,
-             version TYPE string,
-           END OF serializer,
-           master_language LIKE sy-langu,
-         END OF ty_metadata.
+ TYPES: BEGIN OF ty_metadata,
+         class   TYPE string,
+         version TYPE string,
+       END OF ty_metadata.
 
-  METHODS serialize RAISING zcx_abapgit_object.
+  METHODS serialize
+    IMPORTING
+              io_xml TYPE REF TO zif_abapgit_xml_output
+    RAISING   zcx_abapgit_object.
 
   METHODS deserialize
     IMPORTING
               !iv_package TYPE devclass
+              io_xml      TYPE REF TO zif_abapgit_xml_input
     RAISING   zcx_abapgit_object.
 
   METHODS delete RAISING zcx_abapgit_object.
