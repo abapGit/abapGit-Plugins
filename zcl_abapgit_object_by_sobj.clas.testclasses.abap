@@ -157,7 +157,7 @@ CLASS ltcl_bobf DEFINITION FINAL FOR TESTING
       t200_delete_object        FOR TESTING RAISING cx_static_check.
 
     METHODS get_bobf_container
-      RETURNING VALUE(ro_container) TYPE REF TO lif_external_object_container
+      RETURNING VALUE(ro_container) TYPE REF TO lcl_abapgit_xml_container
       RAISING   cx_static_check.
 
     METHODS get_bopf_persisted_string
@@ -349,42 +349,58 @@ CLASS ltcl_bobf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD class_teardown.
+    DATA lv_deleted TYPE abap_bool.
 
     CALL FUNCTION 'DDIF_OBJECT_DELETE'
       EXPORTING
         type          = 'TTYP'    " Type of ABAP Dictionary object to be deleted
         name          = 'ZAGUT_T_ROOT'    " Name of ABAP Dictionary object to be deleted
+      IMPORTING
+        deleted       = lv_deleted
       EXCEPTIONS
         illegal_input = 1
         no_authority  = 2
         OTHERS        = 3.
+    cl_abap_unit_assert=>assert_not_initial( lv_deleted ).
+
 
     CALL FUNCTION 'DDIF_OBJECT_DELETE'
       EXPORTING
         type          = 'TABL'    " Type of ABAP Dictionary object to be deleted
         name          = 'ZAGUT_S_ROOT'    " Name of ABAP Dictionary object to be deleted
+      IMPORTING
+        deleted       = lv_deleted
       EXCEPTIONS
         illegal_input = 1
         no_authority  = 2
         OTHERS        = 3.
+    cl_abap_unit_assert=>assert_not_initial( lv_deleted ).
+
 
     CALL FUNCTION 'DDIF_OBJECT_DELETE'
       EXPORTING
         type          = 'TABL'    " Type of ABAP Dictionary object to be deleted
         name          = 'ZAGUT_D_ROOT'    " Name of ABAP Dictionary object to be deleted
+      IMPORTING
+        deleted       = lv_deleted
       EXCEPTIONS
         illegal_input = 1
         no_authority  = 2
         OTHERS        = 3.
+    cl_abap_unit_assert=>assert_not_initial( lv_deleted ).
+
 
     CALL FUNCTION 'DDIF_OBJECT_DELETE'
       EXPORTING
         type          = 'TABL'    " Type of ABAP Dictionary object to be deleted
         name          = 'ZAGUT_S_ROOT_D'    " Name of ABAP Dictionary object to be deleted
+      IMPORTING
+        deleted       = lv_deleted
       EXCEPTIONS
         illegal_input = 1
         no_authority  = 2
         OTHERS        = 3.
+    cl_abap_unit_assert=>assert_not_initial( lv_deleted ).
 
   ENDMETHOD.
 
@@ -416,12 +432,26 @@ CLASS ltcl_bobf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD t150_export_object.
-    DATA lo_st_container TYPE REF TO lcl_abapgit_st_container.
-    DATA lv_xml_string   TYPE string.
-    CREATE OBJECT lo_st_container.
-    go_bridge->export_object( lo_st_container ).
+    DATA lo_xml_container   TYPE REF TO lcl_abapgit_xml_container.
+    DATA lv_xml_string      TYPE string.
+    DATA lo_ixml            TYPE REF TO if_ixml.
+    DATA lo_document        TYPE REF TO if_ixml_document.
+    DATA lo_renderer        TYPE REF TO if_ixml_renderer.
 
-    lv_xml_string = lo_st_container->mo_xml->xml_render( abap_false ).
+    CREATE OBJECT lo_xml_container.
+    lo_xml_container->set_xml_output( zcl_abapgit_xml_factory=>create_xml_output( ) ).
+
+    go_bridge->export_object( lo_xml_container ).
+
+    lo_ixml = cl_ixml=>create( ).
+    lo_document = lo_ixml->create_document( ).
+    lo_document->append_child( lo_xml_container->mo_xml_input->get_raw( ) ). "Current design does not allow accessing the DOM of a created xml
+                                                                             "(lcl_xml_output) and in- and out are two different instances...
+
+    lo_renderer = lo_ixml->create_renderer(
+                  document = lo_document
+                  ostream  = lo_ixml->create_stream_factory( )->create_ostream_cstring( lv_xml_string )
+              ).
 
 *    we should not compare the complete string, as the root element contains e. g. the encoding and version.
 *    start with the first _- which is the escaped slash of the first BOPF table
@@ -511,297 +541,338 @@ CLASS ltcl_bobf IMPLEMENTATION.
 
   METHOD get_bobf_container.
 
-    CREATE OBJECT ro_container TYPE lcl_abapgit_st_container
-      EXPORTING
-        io_xml = me->create_xml( iv_xml = me->get_bopf_persisted_string( ) ).
+    CREATE OBJECT ro_container.
+
+    ro_container->set_xml_input( zcl_abapgit_xml_factory=>create_xml_input( iv_xml = me->get_bopf_persisted_string( ) ) ).
+    ro_container->set_xml_output( zcl_abapgit_xml_factory=>create_xml_output( ) ).
 
   ENDMETHOD.
 
   METHOD get_bopf_persisted_string.
 
-    rv_xml = rv_xml && |<?xml version="1.0" encoding="utf-8"?><abapGit version="v0.2-alpha"><_-BOBF_-ACT_CONF>|.
-    rv_xml = rv_xml && |<FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>|.
-    rv_xml = rv_xml && |EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>CONF_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |ACT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
-    rv_xml = rv_xml && |</item><item><POS>7</POS><NAME>NODE_CAT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>CREATE_USER</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>9</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>CHANGE_USER</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>11</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog>|.
-    rv_xml = rv_xml && |<TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<DATA_TAB><_-BOBF_-ACT_CONF><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
-    rv_xml = rv_xml && |<CONF_KEY>AAwphY1KHuW243oCDtz6Gg==</CONF_KEY><BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY>|.
-    rv_xml = rv_xml && |<ACT_KEY>AAwphY1KHuW243oCDtzaGg==</ACT_KEY><NODE_CAT_KEY>AAwphY1KHuW243oCDtw6Gg==</NODE_CAT_KEY>|.
-    rv_xml = rv_xml && |<CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>|.
-    rv_xml = rv_xml && |DEVELOPER</CHANGE_USER><CHANGE_TIME>20160224173020</CHANGE_TIME></_-BOBF_-ACT_CONF>|.
+    rv_xml = rv_xml && |<?xml version="1.0" encoding="utf-8"?><abapGit version="v1.0.0" serializer="ZCL_ABAPGIT_OBJECT_BY_SOBJ" serializer_version="1.0">|.
+    rv_xml = rv_xml && |<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><_-BOBF_-ACT_CONF>|.
     rv_xml = rv_xml && |<_-BOBF_-ACT_CONF><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
-    rv_xml = rv_xml && |<CONF_KEY>AAwphY1KHuW243oCDt06Gg==</CONF_KEY><BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY>|.
-    rv_xml = rv_xml && |<ACT_KEY>AAwphY1KHuW243oCDt0aGg==</ACT_KEY><NODE_CAT_KEY>AAwphY1KHuW243oCDtw6Gg==</NODE_CAT_KEY>|.
-    rv_xml = rv_xml && |<CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>|.
-    rv_xml = rv_xml && |DEVELOPER</CHANGE_USER><CHANGE_TIME>20160224173020</CHANGE_TIME></_-BOBF_-ACT_CONF>|.
+    rv_xml = rv_xml && |<CONF_KEY>AAwphY1KHuW5jj/mrFipDA==</CONF_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<ACT_KEY>AAwphY1KHuW5jj/mrFiJDA==</ACT_KEY><NODE_CAT_KEY>AAwphY1KHuW5jj/mrFfpDA==</NODE_CAT_KEY>|.
+    rv_xml = rv_xml && |<CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>|.
+    rv_xml = rv_xml && |DEVELOPER</CHANGE_USER><CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-ACT_CONF>|.
     rv_xml = rv_xml && |<_-BOBF_-ACT_CONF><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
-    rv_xml = rv_xml && |<CONF_KEY>AAwphY1KHuW243oCDt26Gg==</CONF_KEY><BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY>|.
-    rv_xml = rv_xml && |<ACT_KEY>AAwphY1KHuW243oCDt2aGg==</ACT_KEY><NODE_CAT_KEY>AAwphY1KHuW243oCDtw6Gg==</NODE_CAT_KEY>|.
-    rv_xml = rv_xml && |<CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>|.
-    rv_xml = rv_xml && |DEVELOPER</CHANGE_USER><CHANGE_TIME>20160224173020</CHANGE_TIME></_-BOBF_-ACT_CONF>|.
+    rv_xml = rv_xml && |<CONF_KEY>AAwphY1KHuW5jj/mrFjpDA==</CONF_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<ACT_KEY>AAwphY1KHuW5jj/mrFjJDA==</ACT_KEY><NODE_CAT_KEY>AAwphY1KHuW5jj/mrFfpDA==</NODE_CAT_KEY>|.
+    rv_xml = rv_xml && |<CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>|.
+    rv_xml = rv_xml && |DEVELOPER</CHANGE_USER><CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-ACT_CONF>|.
     rv_xml = rv_xml && |<_-BOBF_-ACT_CONF><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
-    rv_xml = rv_xml && |<CONF_KEY>AAwphY1KHuW243oCDt36Gg==</CONF_KEY><BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY>|.
-    rv_xml = rv_xml && |<ACT_KEY>AAwphY1KHuW243oCDt3aGg==</ACT_KEY><NODE_CAT_KEY>AAwphY1KHuW243oCDtw6Gg==</NODE_CAT_KEY>|.
-    rv_xml = rv_xml && |<CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>|.
-    rv_xml = rv_xml && |DEVELOPER</CHANGE_USER><CHANGE_TIME>20160224173020</CHANGE_TIME></_-BOBF_-ACT_CONF>|.
+    rv_xml = rv_xml && |<CONF_KEY>AAwphY1KHuW5jj/mrFlpDA==</CONF_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<ACT_KEY>AAwphY1KHuW5jj/mrFlJDA==</ACT_KEY><NODE_CAT_KEY>AAwphY1KHuW5jj/mrFfpDA==</NODE_CAT_KEY>|.
+    rv_xml = rv_xml && |<CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>|.
+    rv_xml = rv_xml && |DEVELOPER</CHANGE_USER><CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-ACT_CONF>|.
     rv_xml = rv_xml && |<_-BOBF_-ACT_CONF><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
-    rv_xml = rv_xml && |<CONF_KEY>AAwphY1KHuW243oCDt46Gg==</CONF_KEY><BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY>|.
-    rv_xml = rv_xml && |<ACT_KEY>AAwphY1KHuW243oCDt4aGg==</ACT_KEY><NODE_CAT_KEY>AAwphY1KHuW243oCDtw6Gg==</NODE_CAT_KEY>|.
-    rv_xml = rv_xml && |<CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>|.
-    rv_xml = rv_xml && |DEVELOPER</CHANGE_USER><CHANGE_TIME>20160224173020</CHANGE_TIME></_-BOBF_-ACT_CONF>|.
+    rv_xml = rv_xml && |<CONF_KEY>AAwphY1KHuW5jj/mrFmpDA==</CONF_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<ACT_KEY>AAwphY1KHuW5jj/mrFmJDA==</ACT_KEY><NODE_CAT_KEY>AAwphY1KHuW5jj/mrFfpDA==</NODE_CAT_KEY>|.
+    rv_xml = rv_xml && |<CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>|.
+    rv_xml = rv_xml && |DEVELOPER</CHANGE_USER><CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-ACT_CONF>|.
     rv_xml = rv_xml && |<_-BOBF_-ACT_CONF><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
-    rv_xml = rv_xml && |<CONF_KEY>AAwphY1KHuW243oCDt56Gg==</CONF_KEY><BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY>|.
-    rv_xml = rv_xml && |<ACT_KEY>AAwphY1KHuW243oCDt5aGg==</ACT_KEY><NODE_CAT_KEY>AAwphY1KHuW243oCDtw6Gg==</NODE_CAT_KEY>|.
-    rv_xml = rv_xml && |<CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>|.
-    rv_xml = rv_xml && |DEVELOPER</CHANGE_USER><CHANGE_TIME>20160224173020</CHANGE_TIME></_-BOBF_-ACT_CONF>|.
+    rv_xml = rv_xml && |<CONF_KEY>AAwphY1KHuW5jj/mrFnpDA==</CONF_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<ACT_KEY>AAwphY1KHuW5jj/mrFnJDA==</ACT_KEY><NODE_CAT_KEY>AAwphY1KHuW5jj/mrFfpDA==</NODE_CAT_KEY>|.
+    rv_xml = rv_xml && |<CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>|.
+    rv_xml = rv_xml && |DEVELOPER</CHANGE_USER><CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-ACT_CONF>|.
     rv_xml = rv_xml && |<_-BOBF_-ACT_CONF><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
-    rv_xml = rv_xml && |<CONF_KEY>AAwphY1KHuW243oCDt66Gg==</CONF_KEY><BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY>|.
-    rv_xml = rv_xml && |<ACT_KEY>AAwphY1KHuW243oCDt6aGg==</ACT_KEY><NODE_CAT_KEY>AAwphY1KHuW243oCDtw6Gg==</NODE_CAT_KEY>|.
-    rv_xml = rv_xml && |<CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>|.
-    rv_xml = rv_xml && |DEVELOPER</CHANGE_USER><CHANGE_TIME>20160224173020</CHANGE_TIME></_-BOBF_-ACT_CONF>|.
-    rv_xml = rv_xml && |</DATA_TAB></asx:values></asx:abap></TableContent></_-BOBF_-ACT_CONF><_-BOBF_-ACT_LIST>|.
-    rv_xml = rv_xml && |<FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>|.
-    rv_xml = rv_xml && |EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>ACT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |ACT_CAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
-    rv_xml = rv_xml && |</item><item><POS>7</POS><NAME>ACT_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>ACT_ESR_NAME</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>9</POS><NAME>ACT_GENIL_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>ACT_CARDINALITY</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>11</POS><NAME>NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>ACT_CLASS</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |13</POS><NAME>PARAM_DATA_TYPE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>ESR_PARAM_DATA_T</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |15</POS><NAME>EDIT_MODE</NAME><TYPE_KIND>b</TYPE_KIND><LENGTH>3</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>EXEC_ONLY_ALL</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |17</POS><NAME>MSGID_SUCCESS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>20</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>18</POS><NAME>MSGNO_SUCCESS</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>3</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |19</POS><NAME>MSGID_ERROR</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>20</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>20</POS><NAME>MSGNO_ERROR</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>3</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |21</POS><NAME>MSGID_CHECK</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>20</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>22</POS><NAME>MSGNO_CHECK</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>3</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |23</POS><NAME>ALIAS_ACTION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>24</POS><NAME>SP_MAPPER_CLASS</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |25</POS><NAME>USE_PROXY_TYPE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>26</POS><NAME>PREPARE_IMPL</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |27</POS><NAME>TD_CONTAINER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>28</POS><NAME>TD_CONTAINER_VAR</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |29</POS><NAME>CHK_ACT_ALSO_INT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>30</POS><NAME>BASE_ACTION_KEY</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |31</POS><NAME>EXTENDIBLE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>32</POS><NAME>CREATE_USER</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |33</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>34</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |35</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog>|.
-    rv_xml = rv_xml && |<TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<DATA_TAB><_-BOBF_-ACT_LIST><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
-    rv_xml = rv_xml && |<ACT_KEY>AAwphY1KHuW243oCDtzaGg==</ACT_KEY><BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY>|.
-    rv_xml = rv_xml && |<ACT_CAT>3</ACT_CAT><ACT_NAME>LOCK_ROOT</ACT_NAME><ACT_ESR_NAME/><ACT_GENIL_NAME/>|.
-    rv_xml = rv_xml && |<ACT_CARDINALITY>2</ACT_CARDINALITY><NODE_KEY>AAwphY1KHuW243oCDtwaGg==</NODE_KEY>|.
-    rv_xml = rv_xml && |<ACT_CLASS>/BOBF/CL_LIB_A_LOCK</ACT_CLASS><PARAM_DATA_TYPE>/BOBF/S_FRW_LOCK_PARAMETERS</PARAM_DATA_TYPE>|.
-    rv_xml = rv_xml && |<ESR_PARAM_DATA_T/><EDIT_MODE>0</EDIT_MODE><EXEC_ONLY_ALL/><MSGID_SUCCESS/><MSGNO_SUCCESS/>|.
-    rv_xml = rv_xml && |<MSGID_ERROR/><MSGNO_ERROR/><MSGID_CHECK/><MSGNO_CHECK/><ALIAS_ACTION/><SP_MAPPER_CLASS/>|.
-    rv_xml = rv_xml && |<USE_PROXY_TYPE/><PREPARE_IMPL/><TD_CONTAINER/><TD_CONTAINER_VAR/><CHK_ACT_ALSO_INT/>|.
-    rv_xml = rv_xml && |<BASE_ACTION_KEY/><EXTENDIBLE/><CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>|.
-    rv_xml = rv_xml && |20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>20160224173020</CHANGE_TIME>|.
-    rv_xml = rv_xml && |</_-BOBF_-ACT_LIST><_-BOBF_-ACT_LIST><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>|.
-    rv_xml = rv_xml && |00000</VERSION><ACT_KEY>AAwphY1KHuW243oCDt0aGg==</ACT_KEY><BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY>|.
-    rv_xml = rv_xml && |<ACT_CAT>2</ACT_CAT><ACT_NAME>UNLOCK_ROOT</ACT_NAME><ACT_ESR_NAME/><ACT_GENIL_NAME/>|.
-    rv_xml = rv_xml && |<ACT_CARDINALITY>2</ACT_CARDINALITY><NODE_KEY>AAwphY1KHuW243oCDtwaGg==</NODE_KEY>|.
-    rv_xml = rv_xml && |<ACT_CLASS>/BOBF/CL_LIB_A_LOCK</ACT_CLASS><PARAM_DATA_TYPE>/BOBF/S_FRW_LOCK_PARAMETERS</PARAM_DATA_TYPE>|.
-    rv_xml = rv_xml && |<ESR_PARAM_DATA_T/><EDIT_MODE>0</EDIT_MODE><EXEC_ONLY_ALL/><MSGID_SUCCESS/><MSGNO_SUCCESS/>|.
-    rv_xml = rv_xml && |<MSGID_ERROR/><MSGNO_ERROR/><MSGID_CHECK/><MSGNO_CHECK/><ALIAS_ACTION/><SP_MAPPER_CLASS/>|.
-    rv_xml = rv_xml && |<USE_PROXY_TYPE/><PREPARE_IMPL/><TD_CONTAINER/><TD_CONTAINER_VAR/><CHK_ACT_ALSO_INT/>|.
-    rv_xml = rv_xml && |<BASE_ACTION_KEY/><EXTENDIBLE/><CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>|.
-    rv_xml = rv_xml && |20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>20160224173020</CHANGE_TIME>|.
-    rv_xml = rv_xml && |</_-BOBF_-ACT_LIST><_-BOBF_-ACT_LIST><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>|.
-    rv_xml = rv_xml && |00000</VERSION><ACT_KEY>AAwphY1KHuW243oCDt2aGg==</ACT_KEY><BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY>|.
-    rv_xml = rv_xml && |<ACT_CAT>5</ACT_CAT><ACT_NAME>CREATE_ROOT</ACT_NAME><ACT_ESR_NAME/><ACT_GENIL_NAME/>|.
-    rv_xml = rv_xml && |<ACT_CARDINALITY>2</ACT_CARDINALITY><NODE_KEY>AAwphY1KHuW243oCDtwaGg==</NODE_KEY>|.
-    rv_xml = rv_xml && |<ACT_CLASS/><PARAM_DATA_TYPE/><ESR_PARAM_DATA_T/><EDIT_MODE>0</EDIT_MODE><EXEC_ONLY_ALL/>|.
-    rv_xml = rv_xml && |<MSGID_SUCCESS/><MSGNO_SUCCESS/><MSGID_ERROR/><MSGNO_ERROR/><MSGID_CHECK/><MSGNO_CHECK/>|.
-    rv_xml = rv_xml && |<ALIAS_ACTION/><SP_MAPPER_CLASS/><USE_PROXY_TYPE/><PREPARE_IMPL/><TD_CONTAINER/><TD_CONTAINER_VAR/>|.
-    rv_xml = rv_xml && |<CHK_ACT_ALSO_INT/><BASE_ACTION_KEY/><EXTENDIBLE/><CREATE_USER>DEVELOPER</CREATE_USER>|.
-    rv_xml = rv_xml && |<CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>|.
-    rv_xml = rv_xml && |20160224173020</CHANGE_TIME></_-BOBF_-ACT_LIST><_-BOBF_-ACT_LIST><NAME>ZABAPGIT_UNITTEST</NAME>|.
-    rv_xml = rv_xml && |<EXTENSION/><VERSION>00000</VERSION><ACT_KEY>AAwphY1KHuW243oCDt3aGg==</ACT_KEY><BO_KEY>|.
-    rv_xml = rv_xml && |AAwphY1KHuW243oCDtvaGg==</BO_KEY><ACT_CAT>4</ACT_CAT><ACT_NAME>UPDATE_ROOT</ACT_NAME>|.
-    rv_xml = rv_xml && |<ACT_ESR_NAME/><ACT_GENIL_NAME/><ACT_CARDINALITY>2</ACT_CARDINALITY><NODE_KEY>AAwphY1KHuW243oCDtwaGg==</NODE_KEY>|.
-    rv_xml = rv_xml && |<ACT_CLASS/><PARAM_DATA_TYPE/><ESR_PARAM_DATA_T/><EDIT_MODE>0</EDIT_MODE><EXEC_ONLY_ALL/>|.
-    rv_xml = rv_xml && |<MSGID_SUCCESS/><MSGNO_SUCCESS/><MSGID_ERROR/><MSGNO_ERROR/><MSGID_CHECK/><MSGNO_CHECK/>|.
-    rv_xml = rv_xml && |<ALIAS_ACTION/><SP_MAPPER_CLASS/><USE_PROXY_TYPE/><PREPARE_IMPL/><TD_CONTAINER/>|.
-    rv_xml = rv_xml && |<TD_CONTAINER_VAR/><CHK_ACT_ALSO_INT/><BASE_ACTION_KEY/><EXTENDIBLE/><CREATE_USER>|.
-    rv_xml = rv_xml && |DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER>|.
-    rv_xml = rv_xml && |<CHANGE_TIME>20160224173020</CHANGE_TIME></_-BOBF_-ACT_LIST><_-BOBF_-ACT_LIST><NAME>|.
-    rv_xml = rv_xml && |ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION><ACT_KEY>AAwphY1KHuW243oCDt4aGg==</ACT_KEY>|.
-    rv_xml = rv_xml && |<BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY><ACT_CAT>6</ACT_CAT><ACT_NAME>DELETE_ROOT</ACT_NAME>|.
-    rv_xml = rv_xml && |<ACT_ESR_NAME/><ACT_GENIL_NAME/><ACT_CARDINALITY>2</ACT_CARDINALITY><NODE_KEY>AAwphY1KHuW243oCDtwaGg==</NODE_KEY>|.
-    rv_xml = rv_xml && |<ACT_CLASS/><PARAM_DATA_TYPE/><ESR_PARAM_DATA_T/><EDIT_MODE>0</EDIT_MODE><EXEC_ONLY_ALL/>|.
-    rv_xml = rv_xml && |<MSGID_SUCCESS/><MSGNO_SUCCESS/><MSGID_ERROR/><MSGNO_ERROR/><MSGID_CHECK/><MSGNO_CHECK/>|.
-    rv_xml = rv_xml && |<ALIAS_ACTION/><SP_MAPPER_CLASS/><USE_PROXY_TYPE/><PREPARE_IMPL/><TD_CONTAINER/>|.
-    rv_xml = rv_xml && |<TD_CONTAINER_VAR/><CHK_ACT_ALSO_INT/><BASE_ACTION_KEY/><EXTENDIBLE/><CREATE_USER>|.
-    rv_xml = rv_xml && |DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER>|.
-    rv_xml = rv_xml && |<CHANGE_TIME>20160224173020</CHANGE_TIME></_-BOBF_-ACT_LIST><_-BOBF_-ACT_LIST><NAME>|.
-    rv_xml = rv_xml && |ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION><ACT_KEY>AAwphY1KHuW243oCDt5aGg==</ACT_KEY>|.
-    rv_xml = rv_xml && |<BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY><ACT_CAT>7</ACT_CAT><ACT_NAME>VALIDATE_ROOT</ACT_NAME>|.
-    rv_xml = rv_xml && |<ACT_ESR_NAME/><ACT_GENIL_NAME/><ACT_CARDINALITY>2</ACT_CARDINALITY><NODE_KEY>AAwphY1KHuW243oCDtwaGg==</NODE_KEY>|.
-    rv_xml = rv_xml && |<ACT_CLASS/><PARAM_DATA_TYPE/><ESR_PARAM_DATA_T/><EDIT_MODE>0</EDIT_MODE><EXEC_ONLY_ALL/>|.
-    rv_xml = rv_xml && |<MSGID_SUCCESS/><MSGNO_SUCCESS/><MSGID_ERROR/><MSGNO_ERROR/><MSGID_CHECK/><MSGNO_CHECK/>|.
-    rv_xml = rv_xml && |<ALIAS_ACTION/><SP_MAPPER_CLASS/><USE_PROXY_TYPE/><PREPARE_IMPL/><TD_CONTAINER/><TD_CONTAINER_VAR/>|.
-    rv_xml = rv_xml && |<CHK_ACT_ALSO_INT/><BASE_ACTION_KEY/><EXTENDIBLE/><CREATE_USER>DEVELOPER</CREATE_USER>|.
-    rv_xml = rv_xml && |<CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>|.
-    rv_xml = rv_xml && |20160224173020</CHANGE_TIME></_-BOBF_-ACT_LIST><_-BOBF_-ACT_LIST><NAME>ZABAPGIT_UNITTEST</NAME>|.
-    rv_xml = rv_xml && |<EXTENSION/><VERSION>00000</VERSION><ACT_KEY>AAwphY1KHuW243oCDt6aGg==</ACT_KEY><BO_KEY>|.
-    rv_xml = rv_xml && |AAwphY1KHuW243oCDtvaGg==</BO_KEY><ACT_CAT>8</ACT_CAT><ACT_NAME>SAVE_ROOT</ACT_NAME>|.
-    rv_xml = rv_xml && |<ACT_ESR_NAME/><ACT_GENIL_NAME/><ACT_CARDINALITY>2</ACT_CARDINALITY><NODE_KEY>AAwphY1KHuW243oCDtwaGg==</NODE_KEY>|.
-    rv_xml = rv_xml && |<ACT_CLASS/><PARAM_DATA_TYPE/><ESR_PARAM_DATA_T/><EDIT_MODE>0</EDIT_MODE><EXEC_ONLY_ALL/>|.
-    rv_xml = rv_xml && |<MSGID_SUCCESS/><MSGNO_SUCCESS/><MSGID_ERROR/><MSGNO_ERROR/><MSGID_CHECK/><MSGNO_CHECK/>|.
-    rv_xml = rv_xml && |<ALIAS_ACTION/><SP_MAPPER_CLASS/><USE_PROXY_TYPE/><PREPARE_IMPL/><TD_CONTAINER/>|.
-    rv_xml = rv_xml && |<TD_CONTAINER_VAR/><CHK_ACT_ALSO_INT/><BASE_ACTION_KEY/><EXTENDIBLE/><CREATE_USER>|.
-    rv_xml = rv_xml && |DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER>|.
-    rv_xml = rv_xml && |<CHANGE_TIME>20160224173020</CHANGE_TIME></_-BOBF_-ACT_LIST></DATA_TAB></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></TableContent></_-BOBF_-ACT_LIST><_-BOBF_-ACT_LISTT><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>ACT_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>6</POS>|.
-    rv_xml = rv_xml && |<NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-ACT_LISTT>|.
-    rv_xml = rv_xml && |<_-BOBF_-DET_CONF><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>CONF_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |EXEC_TIME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
-    rv_xml = rv_xml && |</item><item><POS>7</POS><NAME>DET_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>NODE_CAT_KEY</NAME>|.
+    rv_xml = rv_xml && |<CONF_KEY>AAwphY1KHuW5jj/mrFopDA==</CONF_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<ACT_KEY>AAwphY1KHuW5jj/mrFoJDA==</ACT_KEY><NODE_CAT_KEY>AAwphY1KHuW5jj/mrFfpDA==</NODE_CAT_KEY>|.
+    rv_xml = rv_xml && |<CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>|.
+    rv_xml = rv_xml && |DEVELOPER</CHANGE_USER><CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-ACT_CONF>|.
+    rv_xml = rv_xml && |<_-BOBF_-ACT_CONF><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
+    rv_xml = rv_xml && |<CONF_KEY>AAwphY1KHuW5jj/mrFppDA==</CONF_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<ACT_KEY>AAwphY1KHuW5jj/mrFpJDA==</ACT_KEY><NODE_CAT_KEY>AAwphY1KHuW5jj/mrFfpDA==</NODE_CAT_KEY>|.
+    rv_xml = rv_xml && |<CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>|.
+    rv_xml = rv_xml && |DEVELOPER</CHANGE_USER><CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-ACT_CONF>|.
+    rv_xml = rv_xml && |</_-BOBF_-ACT_CONF><_-BOBF_-ACT_CONF_field_catalog><item><POS>1</POS><NAME>NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>CONF_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME>|.
     rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>9</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>CREATE_TIME</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>11</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>CHANGE_TIME</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |</FIELD_CATALOG></asx:values></asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-DET_CONF>|.
-    rv_xml = rv_xml && |<_-BOBF_-DET_LIST><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>DET_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |DET_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>DET_CAT</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>9</POS><NAME>DET_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>EDIT_MODE</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |b</TYPE_KIND><LENGTH>3</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |11</POS><NAME>NO_EXEC_IF_FAIL</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>CHECK_IMPL</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |13</POS><NAME>CHECK_DELTA_IMPL</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>TD_CONTAINER</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |<item><POS>6</POS><NAME>ACT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>NODE_CAT_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>8</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |10</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-ACT_CONF_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-ACT_LIST><_-BOBF_-ACT_LIST><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>|.
+    rv_xml = rv_xml && |00000</VERSION><ACT_KEY>AAwphY1KHuW5jj/mrFiJDA==</ACT_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<ACT_CAT>3</ACT_CAT><ACT_NAME>LOCK_ROOT</ACT_NAME><ACT_ESR_NAME/><ACT_GENIL_NAME/>|.
+    rv_xml = rv_xml && |<ACT_CARDINALITY>2</ACT_CARDINALITY><NODE_KEY>AAwphY1KHuW5jj/mrFfJDA==</NODE_KEY>|.
+    rv_xml = rv_xml && |<ACT_CLASS>/BOBF/CL_LIB_A_LOCK</ACT_CLASS><PARAM_DATA_TYPE>/BOBF/S_FRW_LOCK_PARAMETERS</PARAM_DATA_TYPE>|.
+    rv_xml = rv_xml && |<ESR_PARAM_DATA_T/><EDIT_MODE>0</EDIT_MODE><EXEC_ONLY_ALL/><MSGID_SUCCESS/><MSGNO_SUCCESS/>|.
+    rv_xml = rv_xml && |<MSGID_ERROR/><MSGNO_ERROR/><MSGID_CHECK/><MSGNO_CHECK/><ALIAS_ACTION/><SP_MAPPER_CLASS/>|.
+    rv_xml = rv_xml && |<USE_PROXY_TYPE/><PREPARE_IMPL/><TD_CONTAINER/><TD_CONTAINER_VAR/><CHK_ACT_ALSO_INT/>|.
+    rv_xml = rv_xml && |<BASE_ACTION_KEY/><EXTENDIBLE/><CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME>|.
+    rv_xml = rv_xml && |<CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-ACT_LIST>|.
+    rv_xml = rv_xml && |<_-BOBF_-ACT_LIST><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
+    rv_xml = rv_xml && |<ACT_KEY>AAwphY1KHuW5jj/mrFjJDA==</ACT_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<ACT_CAT>2</ACT_CAT><ACT_NAME>UNLOCK_ROOT</ACT_NAME><ACT_ESR_NAME/><ACT_GENIL_NAME/>|.
+    rv_xml = rv_xml && |<ACT_CARDINALITY>2</ACT_CARDINALITY><NODE_KEY>AAwphY1KHuW5jj/mrFfJDA==</NODE_KEY>|.
+    rv_xml = rv_xml && |<ACT_CLASS>/BOBF/CL_LIB_A_LOCK</ACT_CLASS><PARAM_DATA_TYPE>/BOBF/S_FRW_LOCK_PARAMETERS</PARAM_DATA_TYPE>|.
+    rv_xml = rv_xml && |<ESR_PARAM_DATA_T/><EDIT_MODE>0</EDIT_MODE><EXEC_ONLY_ALL/><MSGID_SUCCESS/><MSGNO_SUCCESS/>|.
+    rv_xml = rv_xml && |<MSGID_ERROR/><MSGNO_ERROR/><MSGID_CHECK/><MSGNO_CHECK/><ALIAS_ACTION/><SP_MAPPER_CLASS/>|.
+    rv_xml = rv_xml && |<USE_PROXY_TYPE/><PREPARE_IMPL/><TD_CONTAINER/><TD_CONTAINER_VAR/><CHK_ACT_ALSO_INT/>|.
+    rv_xml = rv_xml && |<BASE_ACTION_KEY/><EXTENDIBLE/><CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME>|.
+    rv_xml = rv_xml && |<CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-ACT_LIST>|.
+    rv_xml = rv_xml && |<_-BOBF_-ACT_LIST><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
+    rv_xml = rv_xml && |<ACT_KEY>AAwphY1KHuW5jj/mrFlJDA==</ACT_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<ACT_CAT>5</ACT_CAT><ACT_NAME>CREATE_ROOT</ACT_NAME><ACT_ESR_NAME/><ACT_GENIL_NAME/>|.
+    rv_xml = rv_xml && |<ACT_CARDINALITY>2</ACT_CARDINALITY><NODE_KEY>AAwphY1KHuW5jj/mrFfJDA==</NODE_KEY>|.
+    rv_xml = rv_xml && |<ACT_CLASS/><PARAM_DATA_TYPE/><ESR_PARAM_DATA_T/><EDIT_MODE>0</EDIT_MODE><EXEC_ONLY_ALL/>|.
+    rv_xml = rv_xml && |<MSGID_SUCCESS/><MSGNO_SUCCESS/><MSGID_ERROR/><MSGNO_ERROR/><MSGID_CHECK/><MSGNO_CHECK/>|.
+    rv_xml = rv_xml && |<ALIAS_ACTION/><SP_MAPPER_CLASS/><USE_PROXY_TYPE/><PREPARE_IMPL/><TD_CONTAINER/><TD_CONTAINER_VAR/>|.
+    rv_xml = rv_xml && |<CHK_ACT_ALSO_INT/><BASE_ACTION_KEY/><EXTENDIBLE/><CREATE_USER>DEVELOPER</CREATE_USER>|.
+    rv_xml = rv_xml && |<CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>|.
+    rv_xml = rv_xml && |20160307143702</CHANGE_TIME></_-BOBF_-ACT_LIST><_-BOBF_-ACT_LIST><NAME>ZABAPGIT_UNITTEST</NAME>|.
+    rv_xml = rv_xml && |<EXTENSION/><VERSION>00000</VERSION><ACT_KEY>AAwphY1KHuW5jj/mrFmJDA==</ACT_KEY><BO_KEY>|.
+    rv_xml = rv_xml && |AAwphY1KHuW5jj/mrFeJDA==</BO_KEY><ACT_CAT>4</ACT_CAT><ACT_NAME>UPDATE_ROOT</ACT_NAME>|.
+    rv_xml = rv_xml && |<ACT_ESR_NAME/><ACT_GENIL_NAME/><ACT_CARDINALITY>2</ACT_CARDINALITY><NODE_KEY>AAwphY1KHuW5jj/mrFfJDA==</NODE_KEY>|.
+    rv_xml = rv_xml && |<ACT_CLASS/><PARAM_DATA_TYPE/><ESR_PARAM_DATA_T/><EDIT_MODE>0</EDIT_MODE><EXEC_ONLY_ALL/>|.
+    rv_xml = rv_xml && |<MSGID_SUCCESS/><MSGNO_SUCCESS/><MSGID_ERROR/><MSGNO_ERROR/><MSGID_CHECK/><MSGNO_CHECK/>|.
+    rv_xml = rv_xml && |<ALIAS_ACTION/><SP_MAPPER_CLASS/><USE_PROXY_TYPE/><PREPARE_IMPL/><TD_CONTAINER/><TD_CONTAINER_VAR/>|.
+    rv_xml = rv_xml && |<CHK_ACT_ALSO_INT/><BASE_ACTION_KEY/><EXTENDIBLE/><CREATE_USER>DEVELOPER</CREATE_USER>|.
+    rv_xml = rv_xml && |<CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>|.
+    rv_xml = rv_xml && |20160307143702</CHANGE_TIME></_-BOBF_-ACT_LIST><_-BOBF_-ACT_LIST><NAME>ZABAPGIT_UNITTEST</NAME>|.
+    rv_xml = rv_xml && |<EXTENSION/><VERSION>00000</VERSION><ACT_KEY>AAwphY1KHuW5jj/mrFnJDA==</ACT_KEY><BO_KEY>|.
+    rv_xml = rv_xml && |AAwphY1KHuW5jj/mrFeJDA==</BO_KEY><ACT_CAT>6</ACT_CAT><ACT_NAME>DELETE_ROOT</ACT_NAME>|.
+    rv_xml = rv_xml && |<ACT_ESR_NAME/><ACT_GENIL_NAME/><ACT_CARDINALITY>2</ACT_CARDINALITY><NODE_KEY>AAwphY1KHuW5jj/mrFfJDA==</NODE_KEY>|.
+    rv_xml = rv_xml && |<ACT_CLASS/><PARAM_DATA_TYPE/><ESR_PARAM_DATA_T/><EDIT_MODE>0</EDIT_MODE><EXEC_ONLY_ALL/>|.
+    rv_xml = rv_xml && |<MSGID_SUCCESS/><MSGNO_SUCCESS/><MSGID_ERROR/><MSGNO_ERROR/><MSGID_CHECK/><MSGNO_CHECK/>|.
+    rv_xml = rv_xml && |<ALIAS_ACTION/><SP_MAPPER_CLASS/><USE_PROXY_TYPE/><PREPARE_IMPL/><TD_CONTAINER/><TD_CONTAINER_VAR/>|.
+    rv_xml = rv_xml && |<CHK_ACT_ALSO_INT/><BASE_ACTION_KEY/><EXTENDIBLE/><CREATE_USER>DEVELOPER</CREATE_USER>|.
+    rv_xml = rv_xml && |<CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>|.
+    rv_xml = rv_xml && |20160307143702</CHANGE_TIME></_-BOBF_-ACT_LIST><_-BOBF_-ACT_LIST><NAME>ZABAPGIT_UNITTEST</NAME>|.
+    rv_xml = rv_xml && |<EXTENSION/><VERSION>00000</VERSION><ACT_KEY>AAwphY1KHuW5jj/mrFoJDA==</ACT_KEY><BO_KEY>|.
+    rv_xml = rv_xml && |AAwphY1KHuW5jj/mrFeJDA==</BO_KEY><ACT_CAT>7</ACT_CAT><ACT_NAME>VALIDATE_ROOT</ACT_NAME>|.
+    rv_xml = rv_xml && |<ACT_ESR_NAME/><ACT_GENIL_NAME/><ACT_CARDINALITY>2</ACT_CARDINALITY><NODE_KEY>AAwphY1KHuW5jj/mrFfJDA==</NODE_KEY>|.
+    rv_xml = rv_xml && |<ACT_CLASS/><PARAM_DATA_TYPE/><ESR_PARAM_DATA_T/><EDIT_MODE>0</EDIT_MODE><EXEC_ONLY_ALL/>|.
+    rv_xml = rv_xml && |<MSGID_SUCCESS/><MSGNO_SUCCESS/><MSGID_ERROR/><MSGNO_ERROR/><MSGID_CHECK/><MSGNO_CHECK/>|.
+    rv_xml = rv_xml && |<ALIAS_ACTION/><SP_MAPPER_CLASS/><USE_PROXY_TYPE/><PREPARE_IMPL/><TD_CONTAINER/><TD_CONTAINER_VAR/>|.
+    rv_xml = rv_xml && |<CHK_ACT_ALSO_INT/><BASE_ACTION_KEY/><EXTENDIBLE/><CREATE_USER>DEVELOPER</CREATE_USER>|.
+    rv_xml = rv_xml && |<CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>|.
+    rv_xml = rv_xml && |20160307143702</CHANGE_TIME></_-BOBF_-ACT_LIST><_-BOBF_-ACT_LIST><NAME>ZABAPGIT_UNITTEST</NAME>|.
+    rv_xml = rv_xml && |<EXTENSION/><VERSION>00000</VERSION><ACT_KEY>AAwphY1KHuW5jj/mrFpJDA==</ACT_KEY><BO_KEY>|.
+    rv_xml = rv_xml && |AAwphY1KHuW5jj/mrFeJDA==</BO_KEY><ACT_CAT>8</ACT_CAT><ACT_NAME>SAVE_ROOT</ACT_NAME>|.
+    rv_xml = rv_xml && |<ACT_ESR_NAME/><ACT_GENIL_NAME/><ACT_CARDINALITY>2</ACT_CARDINALITY><NODE_KEY>AAwphY1KHuW5jj/mrFfJDA==</NODE_KEY>|.
+    rv_xml = rv_xml && |<ACT_CLASS/><PARAM_DATA_TYPE/><ESR_PARAM_DATA_T/><EDIT_MODE>0</EDIT_MODE><EXEC_ONLY_ALL/>|.
+    rv_xml = rv_xml && |<MSGID_SUCCESS/><MSGNO_SUCCESS/><MSGID_ERROR/><MSGNO_ERROR/><MSGID_CHECK/><MSGNO_CHECK/>|.
+    rv_xml = rv_xml && |<ALIAS_ACTION/><SP_MAPPER_CLASS/><USE_PROXY_TYPE/><PREPARE_IMPL/><TD_CONTAINER/><TD_CONTAINER_VAR/>|.
+    rv_xml = rv_xml && |<CHK_ACT_ALSO_INT/><BASE_ACTION_KEY/><EXTENDIBLE/><CREATE_USER>DEVELOPER</CREATE_USER>|.
+    rv_xml = rv_xml && |<CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>|.
+    rv_xml = rv_xml && |20160307143702</CHANGE_TIME></_-BOBF_-ACT_LIST></_-BOBF_-ACT_LIST><_-BOBF_-ACT_LIST_field_catalog>|.
+    rv_xml = rv_xml && |<item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS><NAME>ACT_KEY</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>ACT_CAT</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>ACT_NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>8</POS><NAME>ACT_ESR_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>ACT_GENIL_NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>10</POS><NAME>ACT_CARDINALITY</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>NODE_KEY</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |12</POS><NAME>ACT_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>13</POS><NAME>PARAM_DATA_TYPE</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |15</POS><NAME>TD_CONTAINER_VAR</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>CREATE_USER</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>17</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>18</POS><NAME>CHANGE_USER</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>19</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>20</POS><NAME>DET_PATTERN</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>21</POS><NAME>SIMPLIFIED_DT_TAG</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap>|.
-    rv_xml = rv_xml && |</FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-DET_LIST>|.
-    rv_xml = rv_xml && |<_-BOBF_-DET_LISTT><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>DET_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>6</POS>|.
-    rv_xml = rv_xml && |<NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-DET_LISTT>|.
-    rv_xml = rv_xml && |<_-BOBF_-DET_NET><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>NET_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |DET_KEY_FROM</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>DET_KEY_TO</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>|.
+    rv_xml = rv_xml && |14</POS><NAME>ESR_PARAM_DATA_T</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>15</POS><NAME>EDIT_MODE</NAME><TYPE_KIND>b</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>3</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>|.
+    rv_xml = rv_xml && |EXEC_ONLY_ALL</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>17</POS><NAME>MSGID_SUCCESS</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>20</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>18</POS><NAME>|.
+    rv_xml = rv_xml && |MSGNO_SUCCESS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>3</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>19</POS><NAME>MSGID_ERROR</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>20</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>20</POS><NAME>|.
+    rv_xml = rv_xml && |MSGNO_ERROR</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>3</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>21</POS><NAME>MSGID_CHECK</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>20</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>22</POS><NAME>|.
+    rv_xml = rv_xml && |MSGNO_CHECK</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>3</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>23</POS><NAME>ALIAS_ACTION</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>24</POS><NAME>|.
+    rv_xml = rv_xml && |SP_MAPPER_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>25</POS><NAME>USE_PROXY_TYPE</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>26</POS><NAME>|.
+    rv_xml = rv_xml && |PREPARE_IMPL</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>27</POS><NAME>TD_CONTAINER</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>28</POS><NAME>|.
+    rv_xml = rv_xml && |TD_CONTAINER_VAR</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>29</POS><NAME>CHK_ACT_ALSO_INT</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>30</POS><NAME>|.
+    rv_xml = rv_xml && |BASE_ACTION_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>31</POS><NAME>EXTENDIBLE</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>32</POS><NAME>|.
     rv_xml = rv_xml && |CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>9</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>33</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>34</POS><NAME>|.
     rv_xml = rv_xml && |CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>11</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-DET_NET>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_ASSOC><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>35</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-ACT_LIST_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-ACT_LISTT/><_-BOBF_-ACT_LISTT_field_catalog><item><POS>1</POS><NAME>LANGU</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>EXTENSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>ACT_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>6</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-ACT_LISTT_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-DET_CONF/><_-BOBF_-DET_CONF_field_catalog><item><POS>1</POS><NAME>NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>CONF_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>6</POS><NAME>EXEC_TIME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>DET_KEY</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |8</POS><NAME>NODE_CAT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>CREATE_USER</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |10</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |12</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></_-BOBF_-DET_CONF_field_catalog><_-BOBF_-DET_LIST/><_-BOBF_-DET_LIST_field_catalog>|.
+    rv_xml = rv_xml && |<item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS><NAME>DET_KEY</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>DET_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>|.
+    rv_xml = rv_xml && |NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>8</POS><NAME>DET_CAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>DET_CLASS</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |10</POS><NAME>EDIT_MODE</NAME><TYPE_KIND>b</TYPE_KIND><LENGTH>3</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>NO_EXEC_IF_FAIL</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS>|.
+    rv_xml = rv_xml && |<NAME>CHECK_IMPL</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>13</POS><NAME>CHECK_DELTA_IMPL</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>|.
+    rv_xml = rv_xml && |TD_CONTAINER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>15</POS><NAME>TD_CONTAINER_VAR</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>|.
+    rv_xml = rv_xml && |CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>17</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>18</POS><NAME>|.
+    rv_xml = rv_xml && |CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>19</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>20</POS><NAME>|.
+    rv_xml = rv_xml && |DET_PATTERN</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>21</POS><NAME>SIMPLIFIED_DT_TAG</NAME><TYPE_KIND>X</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-DET_LIST_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-DET_LISTT/><_-BOBF_-DET_LISTT_field_catalog><item><POS>1</POS><NAME>LANGU</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>EXTENSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>DET_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>6</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-DET_LISTT_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-DET_NET/><_-BOBF_-DET_NET_field_catalog><item><POS>1</POS><NAME>NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>NET_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>6</POS><NAME>DET_KEY_FROM</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>DET_KEY_TO</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |8</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |10</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-DET_NET_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_ASSOC><_-BOBF_-OBM_ASSOC><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>|.
+    rv_xml = rv_xml && |00000</VERSION><ASSOC_KEY>AAwphY1KHuW5jj/mrFgpDA==</ASSOC_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<ASSOC_TYPE>C</ASSOC_TYPE><ASSOC_CAT>V</ASSOC_CAT><ASSOC_NAME>MESSAGE</ASSOC_NAME>|.
+    rv_xml = rv_xml && |<ASSOC_ESR_NAME/><ASSOC_GENIL_NAME/><ASSOC_CLASS/><SOURCE_NODE_KEY>AAwphY1KHuW5jj/mrFfJDA==</SOURCE_NODE_KEY>|.
+    rv_xml = rv_xml && |<ATTR_NAME_SOURCE/><TARGET_NODE_KEY>AAwphY1KHuW5jj/mrFgJDA==</TARGET_NODE_KEY><PARAM_DATA_TYPE/>|.
+    rv_xml = rv_xml && |<CARDINALITY>3</CARDINALITY><QUERY_KEY/><SECKEYNAME/><CHANGE_RESOLVE/><ALIAS_RETRIEVE/>|.
+    rv_xml = rv_xml && |<ALIAS_RETRIEVE_S/><ALIAS_DELETE/><ALIAS_DELETE_S/><ESR_PARAM_DATA_T/><ASSOC_RESOLVE>|.
+    rv_xml = rv_xml && |0</ASSOC_RESOLVE><USE_PROXY_TYPE/><SP_MAPPER_CLASS/><ASSOC_MODELED/><TD_CONTAINER/>|.
+    rv_xml = rv_xml && |<TD_CONTAINER_VAR/><CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME>|.
+    rv_xml = rv_xml && |<CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-OBM_ASSOC>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_ASSOC><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
+    rv_xml = rv_xml && |<ASSOC_KEY>AAwphY1KHuW5jj/mrFhpDA==</ASSOC_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<ASSOC_TYPE>C</ASSOC_TYPE><ASSOC_CAT>L</ASSOC_CAT><ASSOC_NAME>LOCK</ASSOC_NAME><ASSOC_ESR_NAME/>|.
+    rv_xml = rv_xml && |<ASSOC_GENIL_NAME/><ASSOC_CLASS/><SOURCE_NODE_KEY>AAwphY1KHuW5jj/mrFfJDA==</SOURCE_NODE_KEY>|.
+    rv_xml = rv_xml && |<ATTR_NAME_SOURCE/><TARGET_NODE_KEY>AAwphY1KHuW5jj/mrFhJDA==</TARGET_NODE_KEY><PARAM_DATA_TYPE/>|.
+    rv_xml = rv_xml && |<CARDINALITY>2</CARDINALITY><QUERY_KEY/><SECKEYNAME/><CHANGE_RESOLVE/><ALIAS_RETRIEVE/>|.
+    rv_xml = rv_xml && |<ALIAS_RETRIEVE_S/><ALIAS_DELETE/><ALIAS_DELETE_S/><ESR_PARAM_DATA_T/><ASSOC_RESOLVE>|.
+    rv_xml = rv_xml && |0</ASSOC_RESOLVE><USE_PROXY_TYPE/><SP_MAPPER_CLASS/><ASSOC_MODELED/><TD_CONTAINER/>|.
+    rv_xml = rv_xml && |<TD_CONTAINER_VAR/><CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME>|.
+    rv_xml = rv_xml && |<CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-OBM_ASSOC>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_ASSOC><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
+    rv_xml = rv_xml && |<ASSOC_KEY>AAwphY1KHuW5jj/mrFkpDA==</ASSOC_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<ASSOC_TYPE>C</ASSOC_TYPE><ASSOC_CAT>F</ASSOC_CAT><ASSOC_NAME>PROPERTY</ASSOC_NAME>|.
+    rv_xml = rv_xml && |<ASSOC_ESR_NAME/><ASSOC_GENIL_NAME/><ASSOC_CLASS/><SOURCE_NODE_KEY>AAwphY1KHuW5jj/mrFfJDA==</SOURCE_NODE_KEY>|.
+    rv_xml = rv_xml && |<ATTR_NAME_SOURCE/><TARGET_NODE_KEY>AAwphY1KHuW5jj/mrFkJDA==</TARGET_NODE_KEY><PARAM_DATA_TYPE>|.
+    rv_xml = rv_xml && |/BOBF/S_FRW_C_PROPERTY</PARAM_DATA_TYPE><CARDINALITY>3</CARDINALITY><QUERY_KEY/><SECKEYNAME/>|.
+    rv_xml = rv_xml && |<CHANGE_RESOLVE/><ALIAS_RETRIEVE/><ALIAS_RETRIEVE_S/><ALIAS_DELETE/><ALIAS_DELETE_S/>|.
+    rv_xml = rv_xml && |<ESR_PARAM_DATA_T/><ASSOC_RESOLVE>0</ASSOC_RESOLVE><USE_PROXY_TYPE/><SP_MAPPER_CLASS/>|.
+    rv_xml = rv_xml && |<ASSOC_MODELED/><TD_CONTAINER/><TD_CONTAINER_VAR/><CREATE_USER>DEVELOPER</CREATE_USER>|.
+    rv_xml = rv_xml && |<CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>|.
+    rv_xml = rv_xml && |20160307143702</CHANGE_TIME></_-BOBF_-OBM_ASSOC><_-BOBF_-OBM_ASSOC><NAME>ZABAPGIT_UNITTEST</NAME>|.
+    rv_xml = rv_xml && |<EXTENSION/><VERSION>00000</VERSION><ASSOC_KEY>AAwphY1KHuW5jj/mrFqJDA==</ASSOC_KEY>|.
+    rv_xml = rv_xml && |<BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY><ASSOC_TYPE>A</ASSOC_TYPE><ASSOC_CAT>P</ASSOC_CAT>|.
+    rv_xml = rv_xml && |<ASSOC_NAME>TO_PARENT</ASSOC_NAME><ASSOC_ESR_NAME/><ASSOC_GENIL_NAME/><ASSOC_CLASS/>|.
+    rv_xml = rv_xml && |<SOURCE_NODE_KEY>AAwphY1KHuW5jj/mrFgJDA==</SOURCE_NODE_KEY><ATTR_NAME_SOURCE/><TARGET_NODE_KEY>|.
+    rv_xml = rv_xml && |AAwphY1KHuW5jj/mrFfJDA==</TARGET_NODE_KEY><PARAM_DATA_TYPE/><CARDINALITY>2</CARDINALITY>|.
+    rv_xml = rv_xml && |<QUERY_KEY/><SECKEYNAME/><CHANGE_RESOLVE/><ALIAS_RETRIEVE/><ALIAS_RETRIEVE_S/><ALIAS_DELETE/>|.
+    rv_xml = rv_xml && |<ALIAS_DELETE_S/><ESR_PARAM_DATA_T/><ASSOC_RESOLVE>1</ASSOC_RESOLVE><USE_PROXY_TYPE/>|.
+    rv_xml = rv_xml && |<SP_MAPPER_CLASS/><ASSOC_MODELED/><TD_CONTAINER/><TD_CONTAINER_VAR/><CREATE_USER>|.
+    rv_xml = rv_xml && |DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER>|.
+    rv_xml = rv_xml && |<CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-OBM_ASSOC><_-BOBF_-OBM_ASSOC><NAME>|.
+    rv_xml = rv_xml && |ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION><ASSOC_KEY>AAwphY1KHuW5jj/mrFqpDA==</ASSOC_KEY>|.
+    rv_xml = rv_xml && |<BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY><ASSOC_TYPE>A</ASSOC_TYPE><ASSOC_CAT>P</ASSOC_CAT>|.
+    rv_xml = rv_xml && |<ASSOC_NAME>TO_PARENT</ASSOC_NAME><ASSOC_ESR_NAME/><ASSOC_GENIL_NAME/><ASSOC_CLASS/>|.
+    rv_xml = rv_xml && |<SOURCE_NODE_KEY>AAwphY1KHuW5jj/mrFhJDA==</SOURCE_NODE_KEY><ATTR_NAME_SOURCE/><TARGET_NODE_KEY>|.
+    rv_xml = rv_xml && |AAwphY1KHuW5jj/mrFfJDA==</TARGET_NODE_KEY><PARAM_DATA_TYPE/><CARDINALITY>2</CARDINALITY>|.
+    rv_xml = rv_xml && |<QUERY_KEY/><SECKEYNAME/><CHANGE_RESOLVE/><ALIAS_RETRIEVE/><ALIAS_RETRIEVE_S/><ALIAS_DELETE/>|.
+    rv_xml = rv_xml && |<ALIAS_DELETE_S/><ESR_PARAM_DATA_T/><ASSOC_RESOLVE>1</ASSOC_RESOLVE><USE_PROXY_TYPE/>|.
+    rv_xml = rv_xml && |<SP_MAPPER_CLASS/><ASSOC_MODELED/><TD_CONTAINER/><TD_CONTAINER_VAR/><CREATE_USER>|.
+    rv_xml = rv_xml && |DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER>|.
+    rv_xml = rv_xml && |<CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-OBM_ASSOC><_-BOBF_-OBM_ASSOC><NAME>|.
+    rv_xml = rv_xml && |ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION><ASSOC_KEY>AAwphY1KHuW5jj/mrFrJDA==</ASSOC_KEY>|.
+    rv_xml = rv_xml && |<BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY><ASSOC_TYPE>A</ASSOC_TYPE><ASSOC_CAT>P</ASSOC_CAT>|.
+    rv_xml = rv_xml && |<ASSOC_NAME>TO_PARENT</ASSOC_NAME><ASSOC_ESR_NAME/><ASSOC_GENIL_NAME/><ASSOC_CLASS/>|.
+    rv_xml = rv_xml && |<SOURCE_NODE_KEY>AAwphY1KHuW5jj/mrFkJDA==</SOURCE_NODE_KEY><ATTR_NAME_SOURCE/><TARGET_NODE_KEY>|.
+    rv_xml = rv_xml && |AAwphY1KHuW5jj/mrFfJDA==</TARGET_NODE_KEY><PARAM_DATA_TYPE/><CARDINALITY>2</CARDINALITY>|.
+    rv_xml = rv_xml && |<QUERY_KEY/><SECKEYNAME/><CHANGE_RESOLVE/><ALIAS_RETRIEVE/><ALIAS_RETRIEVE_S/><ALIAS_DELETE/>|.
+    rv_xml = rv_xml && |<ALIAS_DELETE_S/><ESR_PARAM_DATA_T/><ASSOC_RESOLVE>1</ASSOC_RESOLVE><USE_PROXY_TYPE/>|.
+    rv_xml = rv_xml && |<SP_MAPPER_CLASS/><ASSOC_MODELED/><TD_CONTAINER/><TD_CONTAINER_VAR/><CREATE_USER>|.
+    rv_xml = rv_xml && |DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER>|.
+    rv_xml = rv_xml && |<CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-OBM_ASSOC></_-BOBF_-OBM_ASSOC>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_ASSOC_field_catalog><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
     rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
@@ -810,205 +881,129 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
     rv_xml = rv_xml && |ASSOC_TYPE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>ASSOC_CAT</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>|.
-    rv_xml = rv_xml && |ASSOC_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>9</POS><NAME>ASSOC_ESR_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>|.
-    rv_xml = rv_xml && |ASSOC_GENIL_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>29</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>11</POS><NAME>ASSOC_CLASS</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>|.
-    rv_xml = rv_xml && |SOURCE_NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>13</POS><NAME>ATTR_NAME_SOURCE</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>|.
-    rv_xml = rv_xml && |TARGET_NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>15</POS><NAME>PARAM_DATA_TYPE</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>|.
-    rv_xml = rv_xml && |CARDINALITY</NAME><TYPE_KIND>b</TYPE_KIND><LENGTH>3</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>17</POS><NAME>QUERY_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>18</POS><NAME>|.
-    rv_xml = rv_xml && |SECKEYNAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>19</POS><NAME>CHANGE_RESOLVE</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>20</POS><NAME>|.
-    rv_xml = rv_xml && |ALIAS_RETRIEVE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>21</POS><NAME>ALIAS_RETRIEVE_S</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>22</POS><NAME>|.
-    rv_xml = rv_xml && |ALIAS_DELETE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>23</POS><NAME>ALIAS_DELETE_S</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>24</POS><NAME>|.
-    rv_xml = rv_xml && |ESR_PARAM_DATA_T</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>25</POS><NAME>ASSOC_RESOLVE</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>26</POS><NAME>|.
-    rv_xml = rv_xml && |USE_PROXY_TYPE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>27</POS><NAME>SP_MAPPER_CLASS</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>28</POS><NAME>|.
-    rv_xml = rv_xml && |ASSOC_MODELED</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>29</POS><NAME>TD_CONTAINER</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>30</POS><NAME>|.
-    rv_xml = rv_xml && |TD_CONTAINER_VAR</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>31</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>32</POS><NAME>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>ASSOC_CAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>ASSOC_NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>9</POS><NAME>ASSOC_ESR_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>ASSOC_GENIL_NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>29</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>11</POS><NAME>ASSOC_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>SOURCE_NODE_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>13</POS><NAME>ATTR_NAME_SOURCE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>TARGET_NODE_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>15</POS><NAME>PARAM_DATA_TYPE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>CARDINALITY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>b</TYPE_KIND><LENGTH>3</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item>|.
+    rv_xml = rv_xml && |<POS>17</POS><NAME>QUERY_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>18</POS><NAME>SECKEYNAME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |19</POS><NAME>CHANGE_RESOLVE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>20</POS><NAME>ALIAS_RETRIEVE</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |21</POS><NAME>ALIAS_RETRIEVE_S</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>22</POS><NAME>ALIAS_DELETE</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |23</POS><NAME>ALIAS_DELETE_S</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>24</POS><NAME>ESR_PARAM_DATA_T</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |25</POS><NAME>ASSOC_RESOLVE</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>26</POS><NAME>USE_PROXY_TYPE</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>27</POS>|.
+    rv_xml = rv_xml && |<NAME>SP_MAPPER_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>28</POS><NAME>ASSOC_MODELED</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>29</POS>|.
+    rv_xml = rv_xml && |<NAME>TD_CONTAINER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>30</POS><NAME>TD_CONTAINER_VAR</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>31</POS><NAME>|.
+    rv_xml = rv_xml && |CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>32</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>33</POS><NAME>|.
+    rv_xml = rv_xml && |CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>34</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_ASSOC_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_ASSOCC/><_-BOBF_-OBM_ASSOCC_field_catalog><item><POS>1</POS><NAME>NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>CONF_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>6</POS><NAME>ASSOC_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>NODE_CAT_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>8</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |10</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_ASSOCC_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_ASSOCT/><_-BOBF_-OBM_ASSOCT_field_catalog><item><POS>1</POS><NAME>LANGU</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>EXTENSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>ASSOC_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>6</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_ASSOCT_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_BO><_-BOBF_-OBM_BO><BO_NAME>ZABAPGIT_UNITTEST</BO_NAME><EXTENSION/><BO_DELETED/>|.
+    rv_xml = rv_xml && |<BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY><SUPER_BO_KEY/><EXTENSION_KEY/><BO_GENERATED/>|.
+    rv_xml = rv_xml && |<OBJCAT>0</OBJCAT><CUSTOMER_BO>X</CUSTOMER_BO><BO_ESR_NAME/><SUPER_BO_NAME/><CREATE_USER>|.
+    rv_xml = rv_xml && |DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER>|.
+    rv_xml = rv_xml && |<CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-OBM_BO></_-BOBF_-OBM_BO><_-BOBF_-OBM_BO_field_catalog>|.
+    rv_xml = rv_xml && |<item><POS>1</POS><NAME>BO_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>EXTENSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>3</POS><NAME>BO_DELETED</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS><NAME>BO_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>5</POS><NAME>SUPER_BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>EXTENSION_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>7</POS><NAME>BO_GENERATED</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>OBJCAT</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>9</POS>|.
+    rv_xml = rv_xml && |<NAME>CUSTOMER_BO</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>10</POS><NAME>BO_ESR_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>|.
+    rv_xml = rv_xml && |SUPER_BO_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>12</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>13</POS><NAME>|.
     rv_xml = rv_xml && |CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>33</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>34</POS><NAME>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>14</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>15</POS><NAME>|.
     rv_xml = rv_xml && |CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog><TableContent>|.
-    rv_xml = rv_xml && |<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA_TAB>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_ASSOC><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
-    rv_xml = rv_xml && |<ASSOC_KEY>AAwphY1KHuW243oCDtx6Gg==</ASSOC_KEY><BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY>|.
-    rv_xml = rv_xml && |<ASSOC_TYPE>C</ASSOC_TYPE><ASSOC_CAT>V</ASSOC_CAT><ASSOC_NAME>MESSAGE</ASSOC_NAME>|.
-    rv_xml = rv_xml && |<ASSOC_ESR_NAME/><ASSOC_GENIL_NAME/><ASSOC_CLASS/><SOURCE_NODE_KEY>AAwphY1KHuW243oCDtwaGg==</SOURCE_NODE_KEY>|.
-    rv_xml = rv_xml && |<ATTR_NAME_SOURCE/><TARGET_NODE_KEY>AAwphY1KHuW243oCDtxaGg==</TARGET_NODE_KEY><PARAM_DATA_TYPE/>|.
-    rv_xml = rv_xml && |<CARDINALITY>3</CARDINALITY><QUERY_KEY/><SECKEYNAME/><CHANGE_RESOLVE/><ALIAS_RETRIEVE/>|.
-    rv_xml = rv_xml && |<ALIAS_RETRIEVE_S/><ALIAS_DELETE/><ALIAS_DELETE_S/><ESR_PARAM_DATA_T/><ASSOC_RESOLVE>|.
-    rv_xml = rv_xml && |0</ASSOC_RESOLVE><USE_PROXY_TYPE/><SP_MAPPER_CLASS/><ASSOC_MODELED/><TD_CONTAINER/>|.
-    rv_xml = rv_xml && |<TD_CONTAINER_VAR/><CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME>|.
-    rv_xml = rv_xml && |<CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>20160224173020</CHANGE_TIME></_-BOBF_-OBM_ASSOC>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_ASSOC><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
-    rv_xml = rv_xml && |<ASSOC_KEY>AAwphY1KHuW243oCDty6Gg==</ASSOC_KEY><BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY>|.
-    rv_xml = rv_xml && |<ASSOC_TYPE>C</ASSOC_TYPE><ASSOC_CAT>L</ASSOC_CAT><ASSOC_NAME>LOCK</ASSOC_NAME><ASSOC_ESR_NAME/>|.
-    rv_xml = rv_xml && |<ASSOC_GENIL_NAME/><ASSOC_CLASS/><SOURCE_NODE_KEY>AAwphY1KHuW243oCDtwaGg==</SOURCE_NODE_KEY>|.
-    rv_xml = rv_xml && |<ATTR_NAME_SOURCE/><TARGET_NODE_KEY>AAwphY1KHuW243oCDtyaGg==</TARGET_NODE_KEY><PARAM_DATA_TYPE/>|.
-    rv_xml = rv_xml && |<CARDINALITY>2</CARDINALITY><QUERY_KEY/><SECKEYNAME/><CHANGE_RESOLVE/><ALIAS_RETRIEVE/>|.
-    rv_xml = rv_xml && |<ALIAS_RETRIEVE_S/><ALIAS_DELETE/><ALIAS_DELETE_S/><ESR_PARAM_DATA_T/><ASSOC_RESOLVE>|.
-    rv_xml = rv_xml && |0</ASSOC_RESOLVE><USE_PROXY_TYPE/><SP_MAPPER_CLASS/><ASSOC_MODELED/><TD_CONTAINER/>|.
-    rv_xml = rv_xml && |<TD_CONTAINER_VAR/><CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME>|.
-    rv_xml = rv_xml && |<CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>20160224173020</CHANGE_TIME></_-BOBF_-OBM_ASSOC>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_ASSOC><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
-    rv_xml = rv_xml && |<ASSOC_KEY>AAwphY1KHuW243oCDt16Gg==</ASSOC_KEY><BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY>|.
-    rv_xml = rv_xml && |<ASSOC_TYPE>C</ASSOC_TYPE><ASSOC_CAT>F</ASSOC_CAT><ASSOC_NAME>PROPERTY</ASSOC_NAME>|.
-    rv_xml = rv_xml && |<ASSOC_ESR_NAME/><ASSOC_GENIL_NAME/><ASSOC_CLASS/><SOURCE_NODE_KEY>AAwphY1KHuW243oCDtwaGg==</SOURCE_NODE_KEY>|.
-    rv_xml = rv_xml && |<ATTR_NAME_SOURCE/><TARGET_NODE_KEY>AAwphY1KHuW243oCDt1aGg==</TARGET_NODE_KEY><PARAM_DATA_TYPE>|.
-    rv_xml = rv_xml && |/BOBF/S_FRW_C_PROPERTY</PARAM_DATA_TYPE><CARDINALITY>3</CARDINALITY><QUERY_KEY/>|.
-    rv_xml = rv_xml && |<SECKEYNAME/><CHANGE_RESOLVE/><ALIAS_RETRIEVE/><ALIAS_RETRIEVE_S/><ALIAS_DELETE/>|.
-    rv_xml = rv_xml && |<ALIAS_DELETE_S/><ESR_PARAM_DATA_T/><ASSOC_RESOLVE>0</ASSOC_RESOLVE><USE_PROXY_TYPE/>|.
-    rv_xml = rv_xml && |<SP_MAPPER_CLASS/><ASSOC_MODELED/><TD_CONTAINER/><TD_CONTAINER_VAR/><CREATE_USER>|.
-    rv_xml = rv_xml && |DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER>|.
-    rv_xml = rv_xml && |<CHANGE_TIME>20160224173020</CHANGE_TIME></_-BOBF_-OBM_ASSOC><_-BOBF_-OBM_ASSOC>|.
-    rv_xml = rv_xml && |<NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION><ASSOC_KEY>AAwphY1KHuW243oCDt7aGg==</ASSOC_KEY>|.
-    rv_xml = rv_xml && |<BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY><ASSOC_TYPE>A</ASSOC_TYPE><ASSOC_CAT>P</ASSOC_CAT>|.
-    rv_xml = rv_xml && |<ASSOC_NAME>TO_PARENT</ASSOC_NAME><ASSOC_ESR_NAME/><ASSOC_GENIL_NAME/><ASSOC_CLASS/>|.
-    rv_xml = rv_xml && |<SOURCE_NODE_KEY>AAwphY1KHuW243oCDtxaGg==</SOURCE_NODE_KEY><ATTR_NAME_SOURCE/><TARGET_NODE_KEY>|.
-    rv_xml = rv_xml && |AAwphY1KHuW243oCDtwaGg==</TARGET_NODE_KEY><PARAM_DATA_TYPE/><CARDINALITY>2</CARDINALITY>|.
-    rv_xml = rv_xml && |<QUERY_KEY/><SECKEYNAME/><CHANGE_RESOLVE/><ALIAS_RETRIEVE/><ALIAS_RETRIEVE_S/><ALIAS_DELETE/>|.
-    rv_xml = rv_xml && |<ALIAS_DELETE_S/><ESR_PARAM_DATA_T/><ASSOC_RESOLVE>1</ASSOC_RESOLVE><USE_PROXY_TYPE/>|.
-    rv_xml = rv_xml && |<SP_MAPPER_CLASS/><ASSOC_MODELED/><TD_CONTAINER/><TD_CONTAINER_VAR/><CREATE_USER>|.
-    rv_xml = rv_xml && |DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER>|.
-    rv_xml = rv_xml && |<CHANGE_TIME>20160224173020</CHANGE_TIME></_-BOBF_-OBM_ASSOC><_-BOBF_-OBM_ASSOC><NAME>|.
-    rv_xml = rv_xml && |ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION><ASSOC_KEY>AAwphY1KHuW243oCDt76Gg==</ASSOC_KEY>|.
-    rv_xml = rv_xml && |<BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY><ASSOC_TYPE>A</ASSOC_TYPE><ASSOC_CAT>P</ASSOC_CAT>|.
-    rv_xml = rv_xml && |<ASSOC_NAME>TO_PARENT</ASSOC_NAME><ASSOC_ESR_NAME/><ASSOC_GENIL_NAME/><ASSOC_CLASS/>|.
-    rv_xml = rv_xml && |<SOURCE_NODE_KEY>AAwphY1KHuW243oCDtyaGg==</SOURCE_NODE_KEY><ATTR_NAME_SOURCE/><TARGET_NODE_KEY>|.
-    rv_xml = rv_xml && |AAwphY1KHuW243oCDtwaGg==</TARGET_NODE_KEY><PARAM_DATA_TYPE/><CARDINALITY>2</CARDINALITY>|.
-    rv_xml = rv_xml && |<QUERY_KEY/><SECKEYNAME/><CHANGE_RESOLVE/><ALIAS_RETRIEVE/><ALIAS_RETRIEVE_S/><ALIAS_DELETE/>|.
-    rv_xml = rv_xml && |<ALIAS_DELETE_S/><ESR_PARAM_DATA_T/><ASSOC_RESOLVE>1</ASSOC_RESOLVE><USE_PROXY_TYPE/>|.
-    rv_xml = rv_xml && |<SP_MAPPER_CLASS/><ASSOC_MODELED/><TD_CONTAINER/><TD_CONTAINER_VAR/><CREATE_USER>|.
-    rv_xml = rv_xml && |DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER>|.
-    rv_xml = rv_xml && |<CHANGE_TIME>20160224173020</CHANGE_TIME></_-BOBF_-OBM_ASSOC><_-BOBF_-OBM_ASSOC>|.
-    rv_xml = rv_xml && |<NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION><ASSOC_KEY>AAwphY1KHuW243oCDt8aGg==</ASSOC_KEY>|.
-    rv_xml = rv_xml && |<BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY><ASSOC_TYPE>A</ASSOC_TYPE><ASSOC_CAT>P</ASSOC_CAT>|.
-    rv_xml = rv_xml && |<ASSOC_NAME>TO_PARENT</ASSOC_NAME><ASSOC_ESR_NAME/><ASSOC_GENIL_NAME/><ASSOC_CLASS/>|.
-    rv_xml = rv_xml && |<SOURCE_NODE_KEY>AAwphY1KHuW243oCDt1aGg==</SOURCE_NODE_KEY><ATTR_NAME_SOURCE/><TARGET_NODE_KEY>|.
-    rv_xml = rv_xml && |AAwphY1KHuW243oCDtwaGg==</TARGET_NODE_KEY><PARAM_DATA_TYPE/><CARDINALITY>2</CARDINALITY>|.
-    rv_xml = rv_xml && |<QUERY_KEY/><SECKEYNAME/><CHANGE_RESOLVE/><ALIAS_RETRIEVE/><ALIAS_RETRIEVE_S/><ALIAS_DELETE/>|.
-    rv_xml = rv_xml && |<ALIAS_DELETE_S/><ESR_PARAM_DATA_T/><ASSOC_RESOLVE>1</ASSOC_RESOLVE><USE_PROXY_TYPE/>|.
-    rv_xml = rv_xml && |<SP_MAPPER_CLASS/><ASSOC_MODELED/><TD_CONTAINER/><TD_CONTAINER_VAR/><CREATE_USER>|.
-    rv_xml = rv_xml && |DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER>|.
-    rv_xml = rv_xml && |<CHANGE_TIME>20160224173020</CHANGE_TIME></_-BOBF_-OBM_ASSOC></DATA_TAB></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></TableContent></_-BOBF_-OBM_ASSOC><_-BOBF_-OBM_ASSOCC><FieldCatalog>|.
-    rv_xml = rv_xml && |<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><FIELD_CATALOG>|.
+    rv_xml = rv_xml && |<IS_KEY/></item></_-BOBF_-OBM_BO_field_catalog><_-BOBF_-OBM_GROUP/><_-BOBF_-OBM_GROUP_field_catalog>|.
     rv_xml = rv_xml && |<item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
     rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
     rv_xml = rv_xml && |<POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS><NAME>CONF_KEY</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS><NAME>GROUP_KEY</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
     rv_xml = rv_xml && |<POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>ASSOC_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>|.
-    rv_xml = rv_xml && |NODE_CAT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>8</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>|.
-    rv_xml = rv_xml && |CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>10</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>|.
-    rv_xml = rv_xml && |CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog><TableContent>|.
-    rv_xml = rv_xml && |<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA_TAB/>|.
-    rv_xml = rv_xml && |</asx:values></asx:abap></TableContent></_-BOBF_-OBM_ASSOCC><_-BOBF_-OBM_ASSOCT>|.
-    rv_xml = rv_xml && |<FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<FIELD_CATALOG><item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>|.
-    rv_xml = rv_xml && |NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>|.
-    rv_xml = rv_xml && |X</IS_KEY></item><item><POS>3</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>ASSOC_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>6</POS>|.
-    rv_xml = rv_xml && |<NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_ASSOCT>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_BO><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>BO_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>BO_DELETED</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>5</POS><NAME>SUPER_BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |EXTENSION_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>BO_GENERATED</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>|.
-    rv_xml = rv_xml && |OBJCAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
-    rv_xml = rv_xml && |</item><item><POS>9</POS><NAME>CUSTOMER_BO</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>BO_ESR_NAME</NAME>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>GROUP_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>|.
+    rv_xml = rv_xml && |GROUP_CAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>8</POS><NAME>NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>STATUS_VARIABLE</NAME>|.
     rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>11</POS><NAME>SUPER_BO_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>CREATE_USER</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>13</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>CHANGE_USER</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>15</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog>|.
-    rv_xml = rv_xml && |<TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<DATA_TAB><_-BOBF_-OBM_BO><BO_NAME>ZABAPGIT_UNITTEST</BO_NAME><EXTENSION/><BO_DELETED/>|.
-    rv_xml = rv_xml && |<BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY><SUPER_BO_KEY/><EXTENSION_KEY/><BO_GENERATED/>|.
-    rv_xml = rv_xml && |<OBJCAT>0</OBJCAT><CUSTOMER_BO>X</CUSTOMER_BO><BO_ESR_NAME/><SUPER_BO_NAME/><CREATE_USER>|.
-    rv_xml = rv_xml && |DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER>|.
-    rv_xml = rv_xml && |<CHANGE_TIME>20160224173020</CHANGE_TIME></_-BOBF_-OBM_BO></DATA_TAB></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></TableContent></_-BOBF_-OBM_BO><_-BOBF_-OBM_GROUP><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>GROUP_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |GROUP_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>GROUP_CAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>NODE_KEY</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>9</POS><NAME>STATUS_VARIABLE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>STA_VAR_KEY</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>11</POS><NAME>ACT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>CHECK_IMMEDIATE</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>13</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>CREATE_TIME</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>15</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>CHANGE_TIME</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |</FIELD_CATALOG></asx:values></asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_GROUP>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_GROUPC><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<item><POS>10</POS><NAME>STA_VAR_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>ACT_KEY</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |12</POS><NAME>CHECK_IMMEDIATE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>13</POS><NAME>CREATE_USER</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |14</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>15</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |16</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_GROUP_field_catalog><_-BOBF_-OBM_GROUPC/>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_GROUPC_field_catalog><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
     rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
@@ -1026,25 +1021,19 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |<IS_KEY/></item><item><POS>11</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>|.
     rv_xml = rv_xml && |CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog><TableContent>|.
-    rv_xml = rv_xml && |<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA_TAB/>|.
-    rv_xml = rv_xml && |</asx:values></asx:abap></TableContent></_-BOBF_-OBM_GROUPC><_-BOBF_-OBM_GROUPT>|.
-    rv_xml = rv_xml && |<FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<FIELD_CATALOG><item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>|.
-    rv_xml = rv_xml && |NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>|.
-    rv_xml = rv_xml && |X</IS_KEY></item><item><POS>3</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>GROUP_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>6</POS>|.
-    rv_xml = rv_xml && |<NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_GROUPT>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_MAP><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<IS_KEY/></item></_-BOBF_-OBM_GROUPC_field_catalog><_-BOBF_-OBM_GROUPT/><_-BOBF_-OBM_GROUPT_field_catalog>|.
+    rv_xml = rv_xml && |<item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>NAME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>3</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS><NAME>VERSION</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>5</POS><NAME>GROUP_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>6</POS><NAME>BO_KEY</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>40</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_GROUPT_field_catalog><_-BOBF_-OBM_MAP/>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_MAP_field_catalog><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
     rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
@@ -1054,104 +1043,151 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
     rv_xml = rv_xml && |CONTENT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>CONTENT_CAT</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>|.
-    rv_xml = rv_xml && |HIERARCHY_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>9</POS><NAME>FIELDNAME_EXT</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>|.
-    rv_xml = rv_xml && |FIELDNAME_INT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>11</POS><NAME>CONV_RULE</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>3</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>|.
-    rv_xml = rv_xml && |REDUNDANT_ATTR</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>13</POS><NAME>CONST_INTERFACE</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>|.
-    rv_xml = rv_xml && |READ_REPEATABLE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>15</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>|.
-    rv_xml = rv_xml && |CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>17</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>18</POS><NAME>|.
-    rv_xml = rv_xml && |CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog><TableContent>|.
-    rv_xml = rv_xml && |<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA_TAB/>|.
-    rv_xml = rv_xml && |</asx:values></asx:abap></TableContent></_-BOBF_-OBM_MAP><_-BOBF_-OBM_NCAT><FieldCatalog>|.
-    rv_xml = rv_xml && |<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><FIELD_CATALOG>|.
-    rv_xml = rv_xml && |<item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
-    rv_xml = rv_xml && |<POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS><NAME>NODE_CAT_KEY</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
-    rv_xml = rv_xml && |</item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>NODE_KEY</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>HIERARCHY_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>9</POS><NAME>FIELDNAME_EXT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>FIELDNAME_INT</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>11</POS><NAME>CONV_RULE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>3</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>REDUNDANT_ATTR</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item>|.
+    rv_xml = rv_xml && |<POS>13</POS><NAME>CONST_INTERFACE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>READ_REPEATABLE</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item>|.
+    rv_xml = rv_xml && |<POS>15</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |17</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>18</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_MAP_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_NCAT><_-BOBF_-OBM_NCAT><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>|.
+    rv_xml = rv_xml && |00000</VERSION><NODE_CAT_KEY>AAwphY1KHuW5jj/mrFfpDA==</NODE_CAT_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<NODE_KEY>AAwphY1KHuW5jj/mrFfJDA==</NODE_KEY><NODE_CAT_NAME>ROOT</NODE_CAT_NAME><STATUS_SCHEMA/>|.
+    rv_xml = rv_xml && |<STAT_SCHEMA_KEY/><CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME>|.
+    rv_xml = rv_xml && |<CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-OBM_NCAT>|.
+    rv_xml = rv_xml && |</_-BOBF_-OBM_NCAT><_-BOBF_-OBM_NCAT_field_catalog><item><POS>1</POS><NAME>NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>NODE_CAT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>|.
+    rv_xml = rv_xml && |BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>6</POS><NAME>NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>NODE_CAT_NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>8</POS><NAME>STATUS_SCHEMA</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>STAT_SCHEMA_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>10</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>CREATE_TIME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>12</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>13</POS><NAME>CHANGE_TIME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |</_-BOBF_-OBM_NCAT_field_catalog><_-BOBF_-OBM_NCATT/><_-BOBF_-OBM_NCATT_field_catalog>|.
+    rv_xml = rv_xml && |<item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>NAME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>3</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS><NAME>VERSION</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>5</POS><NAME>NODE_CAT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>6</POS><NAME>BO_KEY</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |7</POS><NAME>NODE_CAT_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>STATUS_SCHEMA</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>40</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_NCATT_field_catalog><_-BOBF_-OBM_NODE><_-BOBF_-OBM_NODE>|.
+    rv_xml = rv_xml && |<NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION><NODE_KEY>AAwphY1KHuW5jj/mrFfJDA==</NODE_KEY>|.
+    rv_xml = rv_xml && |<BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY><OBJ_KEY>AAwphY1KHuW5jj/mrFepDA==</OBJ_KEY>|.
+    rv_xml = rv_xml && |<NODE_NAME>ROOT</NODE_NAME><NODE_ESR_NAME/><NODE_ESR_PREFIX/><NODE_GENIL_NAME/><DATA_TYPE>|.
+    rv_xml = rv_xml && |ZALICE_S_ROOT</DATA_TYPE><DATA_DATA_TYPE>ZALICE_S_ROOT_D</DATA_DATA_TYPE><DATA_DATA_TYPE_T/>|.
+    rv_xml = rv_xml && |<DATA_TABLE_TYPE>ZALICE_T_ROOT</DATA_TABLE_TYPE><GDT_DATA_TYPE/><PRX_DAT_DAT_TYPE/>|.
+    rv_xml = rv_xml && |<EXT_INCL_NAME/><EXT_INCL_NAME_T/><DATABASE_TABLE>ZALICE_D_ROOT</DATABASE_TABLE><NODE_TYPE>|.
+    rv_xml = rv_xml && |N</NODE_TYPE><NODE_CAT_KEY>AAwphY1KHuW5jj/mrFfpDA==</NODE_CAT_KEY><SP_MAPPER_CLASS/>|.
+    rv_xml = rv_xml && |<SP_ID_MAP_CLASS/><BUF_CLASS>/BOBF/CL_BUF_SIMPLE</BUF_CLASS><MAPPER_CLASS/><DELEGATION_CLASS/>|.
+    rv_xml = rv_xml && |<LCP_WRAP_CLASS/><LOADABLE>X</LOADABLE><LOCKABLE>X</LOCKABLE><TRANSIENT/><SUBTREE_PROPERTY/>|.
+    rv_xml = rv_xml && |<KEY_INHERITED/><USE_PROXY_TYPE/><NODE_CLASS/><ALIAS_RETRIEVE/><ALIAS_RETRIEVE_S/>|.
+    rv_xml = rv_xml && |<ALIAS_CREATE_S/><ALIAS_UPDATE_S/><ALIAS_DELETE_S/><KEY_SECKEYNAME/><ROOT_SECKEYNAME/>|.
+    rv_xml = rv_xml && |<STA_CHILD_ASSOC/><STA_PARENT_ASSOC/><REF_BO_KEY/><REF_NODE_KEY/><EXTENDIBLE/><AUTH_CHECK_CLASS/>|.
+    rv_xml = rv_xml && |<AUTH_CHECK_RELEVANT/><CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME>|.
+    rv_xml = rv_xml && |<CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-OBM_NODE>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_NODE><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
+    rv_xml = rv_xml && |<NODE_KEY>AAwphY1KHuW5jj/mrFgJDA==</NODE_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<OBJ_KEY>AAwphY1KHuW5jj/mrFepDA==</OBJ_KEY><NODE_NAME>ROOT_MESSAGE</NODE_NAME><NODE_ESR_NAME/>|.
+    rv_xml = rv_xml && |<NODE_ESR_PREFIX/><NODE_GENIL_NAME/><DATA_TYPE>/BOBF/S_FRW_MESSAGE_K</DATA_TYPE><DATA_DATA_TYPE>|.
+    rv_xml = rv_xml && |/BOBF/S_FRW_MESSAGE_D</DATA_DATA_TYPE><DATA_DATA_TYPE_T/><DATA_TABLE_TYPE>/BOBF/T_FRW_MESSAGE_K</DATA_TABLE_TYPE>|.
+    rv_xml = rv_xml && |<GDT_DATA_TYPE/><PRX_DAT_DAT_TYPE/><EXT_INCL_NAME/><EXT_INCL_NAME_T/><DATABASE_TABLE/>|.
+    rv_xml = rv_xml && |<NODE_TYPE>V</NODE_TYPE><NODE_CAT_KEY/><SP_MAPPER_CLASS/><SP_ID_MAP_CLASS/><BUF_CLASS>|.
+    rv_xml = rv_xml && |/BOBF/CL_LIB_B_MESSAGE</BUF_CLASS><MAPPER_CLASS/><DELEGATION_CLASS/><LCP_WRAP_CLASS/>|.
+    rv_xml = rv_xml && |<LOADABLE/><LOCKABLE/><TRANSIENT>X</TRANSIENT><SUBTREE_PROPERTY/><KEY_INHERITED/>|.
+    rv_xml = rv_xml && |<USE_PROXY_TYPE/><NODE_CLASS/><ALIAS_RETRIEVE/><ALIAS_RETRIEVE_S/><ALIAS_CREATE_S/>|.
+    rv_xml = rv_xml && |<ALIAS_UPDATE_S/><ALIAS_DELETE_S/><KEY_SECKEYNAME/><ROOT_SECKEYNAME/><STA_CHILD_ASSOC/>|.
+    rv_xml = rv_xml && |<STA_PARENT_ASSOC/><REF_BO_KEY/><REF_NODE_KEY/><EXTENDIBLE/><AUTH_CHECK_CLASS/><AUTH_CHECK_RELEVANT/>|.
+    rv_xml = rv_xml && |<CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>|.
+    rv_xml = rv_xml && |DEVELOPER</CHANGE_USER><CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-OBM_NODE>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_NODE><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
+    rv_xml = rv_xml && |<NODE_KEY>AAwphY1KHuW5jj/mrFhJDA==</NODE_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<OBJ_KEY>AAwphY1KHuW5jj/mrFepDA==</OBJ_KEY><NODE_NAME>ROOT_LOCK</NODE_NAME><NODE_ESR_NAME/>|.
+    rv_xml = rv_xml && |<NODE_ESR_PREFIX/><NODE_GENIL_NAME/><DATA_TYPE>/BOBF/S_FRW_LOCK_NODE</DATA_TYPE><DATA_DATA_TYPE>|.
+    rv_xml = rv_xml && |/BOBF/S_FRW_LOCK_NODE_DATA</DATA_DATA_TYPE><DATA_DATA_TYPE_T/><DATA_TABLE_TYPE>/BOBF/T_FRW_LOCK_NODE</DATA_TABLE_TYPE>|.
+    rv_xml = rv_xml && |<GDT_DATA_TYPE/><PRX_DAT_DAT_TYPE/><EXT_INCL_NAME/><EXT_INCL_NAME_T/><DATABASE_TABLE/>|.
+    rv_xml = rv_xml && |<NODE_TYPE>L</NODE_TYPE><NODE_CAT_KEY/><SP_MAPPER_CLASS/><SP_ID_MAP_CLASS/><BUF_CLASS>|.
+    rv_xml = rv_xml && |/BOBF/CL_LIB_B_LOCK</BUF_CLASS><MAPPER_CLASS/><DELEGATION_CLASS/><LCP_WRAP_CLASS/>|.
+    rv_xml = rv_xml && |<LOADABLE/><LOCKABLE/><TRANSIENT>X</TRANSIENT><SUBTREE_PROPERTY/><KEY_INHERITED/>|.
+    rv_xml = rv_xml && |<USE_PROXY_TYPE/><NODE_CLASS/><ALIAS_RETRIEVE/><ALIAS_RETRIEVE_S/><ALIAS_CREATE_S/>|.
+    rv_xml = rv_xml && |<ALIAS_UPDATE_S/><ALIAS_DELETE_S/><KEY_SECKEYNAME/><ROOT_SECKEYNAME/><STA_CHILD_ASSOC/>|.
+    rv_xml = rv_xml && |<STA_PARENT_ASSOC/><REF_BO_KEY/><REF_NODE_KEY/><EXTENDIBLE/><AUTH_CHECK_CLASS/><AUTH_CHECK_RELEVANT/>|.
+    rv_xml = rv_xml && |<CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>|.
+    rv_xml = rv_xml && |DEVELOPER</CHANGE_USER><CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-OBM_NODE>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_NODE><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
+    rv_xml = rv_xml && |<NODE_KEY>AAwphY1KHuW5jj/mrFkJDA==</NODE_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<OBJ_KEY>AAwphY1KHuW5jj/mrFepDA==</OBJ_KEY><NODE_NAME>ROOT_PROPERTY</NODE_NAME><NODE_ESR_NAME/>|.
+    rv_xml = rv_xml && |<NODE_ESR_PREFIX/><NODE_GENIL_NAME/><DATA_TYPE>/BOBF/S_FRW_PROPERTY_K</DATA_TYPE>|.
+    rv_xml = rv_xml && |<DATA_DATA_TYPE>/BOBF/S_FRW_PROPERTY_D</DATA_DATA_TYPE><DATA_DATA_TYPE_T/><DATA_TABLE_TYPE>|.
+    rv_xml = rv_xml && |/BOBF/T_FRW_PROPERTY_K</DATA_TABLE_TYPE><GDT_DATA_TYPE/><PRX_DAT_DAT_TYPE/><EXT_INCL_NAME/>|.
+    rv_xml = rv_xml && |<EXT_INCL_NAME_T/><DATABASE_TABLE/><NODE_TYPE>F</NODE_TYPE><NODE_CAT_KEY/><SP_MAPPER_CLASS/>|.
+    rv_xml = rv_xml && |<SP_ID_MAP_CLASS/><BUF_CLASS>/BOBF/CL_LIB_B_PROPERTY</BUF_CLASS><MAPPER_CLASS/><DELEGATION_CLASS/>|.
+    rv_xml = rv_xml && |<LCP_WRAP_CLASS/><LOADABLE/><LOCKABLE/><TRANSIENT>X</TRANSIENT><SUBTREE_PROPERTY/>|.
+    rv_xml = rv_xml && |<KEY_INHERITED/><USE_PROXY_TYPE/><NODE_CLASS/><ALIAS_RETRIEVE/><ALIAS_RETRIEVE_S/>|.
+    rv_xml = rv_xml && |<ALIAS_CREATE_S/><ALIAS_UPDATE_S/><ALIAS_DELETE_S/><KEY_SECKEYNAME/><ROOT_SECKEYNAME/>|.
+    rv_xml = rv_xml && |<STA_CHILD_ASSOC/><STA_PARENT_ASSOC/><REF_BO_KEY/><REF_NODE_KEY/><EXTENDIBLE/><AUTH_CHECK_CLASS/>|.
+    rv_xml = rv_xml && |<AUTH_CHECK_RELEVANT/><CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME>|.
+    rv_xml = rv_xml && |<CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>20160307143702</CHANGE_TIME></_-BOBF_-OBM_NODE>|.
+    rv_xml = rv_xml && |</_-BOBF_-OBM_NODE><_-BOBF_-OBM_NODE_field_catalog><item><POS>1</POS><NAME>NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>6</POS><NAME>OBJ_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>NODE_NAME</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |9</POS><NAME>STAT_SCHEMA_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>CREATE_USER</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |11</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |13</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog>|.
-    rv_xml = rv_xml && |<TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<DATA_TAB><_-BOBF_-OBM_NCAT><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
-    rv_xml = rv_xml && |<NODE_CAT_KEY>AAwphY1KHuW243oCDtw6Gg==</NODE_CAT_KEY><BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY>|.
-    rv_xml = rv_xml && |<NODE_KEY>AAwphY1KHuW243oCDtwaGg==</NODE_KEY><NODE_CAT_NAME>ROOT</NODE_CAT_NAME>|.
-    rv_xml = rv_xml && |<STATUS_SCHEMA/><STAT_SCHEMA_KEY/><CREATE_USER>DEVELOPER</CREATE_USER><CREATE_TIME>|.
-    rv_xml = rv_xml && |20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>20160224173020</CHANGE_TIME>|.
-    rv_xml = rv_xml && |</_-BOBF_-OBM_NCAT></DATA_TAB></asx:values></asx:abap></TableContent></_-BOBF_-OBM_NCAT>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_NCATT><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>NODE_CAT_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>6</POS>|.
-    rv_xml = rv_xml && |<NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_NCATT>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_NODE><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |OBJ_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
-    rv_xml = rv_xml && |</item><item><POS>7</POS><NAME>NODE_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>NODE_ESR_NAME</NAME>|.
+    rv_xml = rv_xml && |8</POS><NAME>NODE_ESR_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>NODE_ESR_PREFIX</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |g</TYPE_KIND><LENGTH>255</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |10</POS><NAME>NODE_GENIL_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>19</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>DATA_TYPE</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>|.
+    rv_xml = rv_xml && |DATA_DATA_TYPE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>13</POS><NAME>DATA_DATA_TYPE_T</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>|.
+    rv_xml = rv_xml && |DATA_TABLE_TYPE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>15</POS><NAME>GDT_DATA_TYPE</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>62</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>|.
+    rv_xml = rv_xml && |PRX_DAT_DAT_TYPE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>17</POS><NAME>EXT_INCL_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>18</POS><NAME>|.
+    rv_xml = rv_xml && |EXT_INCL_NAME_T</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>19</POS><NAME>DATABASE_TABLE</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>20</POS><NAME>|.
+    rv_xml = rv_xml && |NODE_TYPE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>21</POS><NAME>NODE_CAT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>22</POS><NAME>SP_MAPPER_CLASS</NAME>|.
     rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>9</POS><NAME>NODE_ESR_PREFIX</NAME><TYPE_KIND>g</TYPE_KIND><LENGTH>255</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>NODE_GENIL_NAME</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>19</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>11</POS><NAME>DATA_TYPE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>DATA_DATA_TYPE</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>13</POS><NAME>DATA_DATA_TYPE_T</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>DATA_TABLE_TYPE</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>15</POS><NAME>GDT_DATA_TYPE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>62</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>PRX_DAT_DAT_TYPE</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>17</POS><NAME>EXT_INCL_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>18</POS><NAME>EXT_INCL_NAME_T</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>19</POS><NAME>DATABASE_TABLE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>16</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>20</POS><NAME>NODE_TYPE</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |21</POS><NAME>NODE_CAT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>22</POS><NAME>SP_MAPPER_CLASS</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |23</POS><NAME>SP_ID_MAP_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>24</POS><NAME>BUF_CLASS</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |<item><POS>23</POS><NAME>SP_ID_MAP_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>24</POS><NAME>BUF_CLASS</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
     rv_xml = rv_xml && |25</POS><NAME>MAPPER_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
     rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>26</POS><NAME>DELEGATION_CLASS</NAME><TYPE_KIND>|.
@@ -1162,113 +1198,67 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |LOCKABLE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
     rv_xml = rv_xml && |</item><item><POS>30</POS><NAME>TRANSIENT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
     rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>31</POS><NAME>SUBTREE_PROPERTY</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>32</POS><NAME>KEY_INHERITED</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item>|.
+    rv_xml = rv_xml && |<POS>32</POS><NAME>KEY_INHERITED</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
     rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>33</POS><NAME>USE_PROXY_TYPE</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>34</POS><NAME>NODE_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>35</POS><NAME>ALIAS_RETRIEVE</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>36</POS><NAME>ALIAS_RETRIEVE_S</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>37</POS><NAME>ALIAS_CREATE_S</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>38</POS><NAME>ALIAS_UPDATE_S</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>39</POS><NAME>ALIAS_DELETE_S</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>40</POS><NAME>KEY_SECKEYNAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>41</POS><NAME>ROOT_SECKEYNAME</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>42</POS><NAME>STA_CHILD_ASSOC</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>43</POS><NAME>STA_PARENT_ASSOC</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>44</POS><NAME>REF_BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>45</POS><NAME>REF_NODE_KEY</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>46</POS><NAME>EXTENDIBLE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>47</POS><NAME>AUTH_CHECK_CLASS</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>48</POS><NAME>AUTH_CHECK_RELEVANT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>49</POS><NAME>CREATE_USER</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item>|.
+    rv_xml = rv_xml && |<POS>34</POS><NAME>NODE_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>35</POS><NAME>ALIAS_RETRIEVE</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |36</POS><NAME>ALIAS_RETRIEVE_S</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>37</POS><NAME>ALIAS_CREATE_S</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |38</POS><NAME>ALIAS_UPDATE_S</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>39</POS><NAME>ALIAS_DELETE_S</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |40</POS><NAME>KEY_SECKEYNAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>41</POS><NAME>ROOT_SECKEYNAME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |42</POS><NAME>STA_CHILD_ASSOC</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>43</POS><NAME>STA_PARENT_ASSOC</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |44</POS><NAME>REF_BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>45</POS><NAME>REF_NODE_KEY</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |46</POS><NAME>EXTENDIBLE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>47</POS><NAME>AUTH_CHECK_CLASS</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |48</POS><NAME>AUTH_CHECK_RELEVANT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>49</POS><NAME>CREATE_USER</NAME>|.
     rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
     rv_xml = rv_xml && |<item><POS>50</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
     rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>51</POS><NAME>CHANGE_USER</NAME>|.
     rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
     rv_xml = rv_xml && |<item><POS>52</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog>|.
-    rv_xml = rv_xml && |<TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<DATA_TAB><_-BOBF_-OBM_NODE><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION>|.
-    rv_xml = rv_xml && |<NODE_KEY>AAwphY1KHuW243oCDtwaGg==</NODE_KEY><BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY>|.
-    rv_xml = rv_xml && |<OBJ_KEY>AAwphY1KHuW243oCDtv6Gg==</OBJ_KEY><NODE_NAME>ROOT</NODE_NAME><NODE_ESR_NAME/>|.
-    rv_xml = rv_xml && |<NODE_ESR_PREFIX/><NODE_GENIL_NAME/><DATA_TYPE>ZAGUT_S_ROOT</DATA_TYPE><DATA_DATA_TYPE>|.
-    rv_xml = rv_xml && |/BOBF/S_DEMO_PRODUCT_HDR</DATA_DATA_TYPE><DATA_DATA_TYPE_T/><DATA_TABLE_TYPE>ZAGUT_T_ROOT</DATA_TABLE_TYPE>|.
-    rv_xml = rv_xml && |<GDT_DATA_TYPE/><PRX_DAT_DAT_TYPE/><EXT_INCL_NAME/><EXT_INCL_NAME_T/><DATABASE_TABLE>|.
-    rv_xml = rv_xml && |ZAGUT_D_ROOT</DATABASE_TABLE><NODE_TYPE>N</NODE_TYPE><NODE_CAT_KEY>AAwphY1KHuW243oCDtw6Gg==</NODE_CAT_KEY>|.
-    rv_xml = rv_xml && |<SP_MAPPER_CLASS/><SP_ID_MAP_CLASS/><BUF_CLASS>/BOBF/CL_BUF_SIMPLE</BUF_CLASS><MAPPER_CLASS/>|.
-    rv_xml = rv_xml && |<DELEGATION_CLASS/><LCP_WRAP_CLASS/><LOADABLE>X</LOADABLE><LOCKABLE>X</LOCKABLE><TRANSIENT/>|.
-    rv_xml = rv_xml && |<SUBTREE_PROPERTY/><KEY_INHERITED/><USE_PROXY_TYPE/><NODE_CLASS/><ALIAS_RETRIEVE/>|.
-    rv_xml = rv_xml && |<ALIAS_RETRIEVE_S/><ALIAS_CREATE_S/><ALIAS_UPDATE_S/><ALIAS_DELETE_S/><KEY_SECKEYNAME/>|.
-    rv_xml = rv_xml && |<ROOT_SECKEYNAME/><STA_CHILD_ASSOC/><STA_PARENT_ASSOC/><REF_BO_KEY/><REF_NODE_KEY/>|.
-    rv_xml = rv_xml && |<EXTENDIBLE/><AUTH_CHECK_CLASS/><AUTH_CHECK_RELEVANT/><CREATE_USER>DEVELOPER</CREATE_USER>|.
-    rv_xml = rv_xml && |<CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>|.
-    rv_xml = rv_xml && |20160224173020</CHANGE_TIME></_-BOBF_-OBM_NODE><_-BOBF_-OBM_NODE><NAME>ZABAPGIT_UNITTEST</NAME>|.
-    rv_xml = rv_xml && |<EXTENSION/><VERSION>00000</VERSION><NODE_KEY>AAwphY1KHuW243oCDtxaGg==</NODE_KEY>|.
-    rv_xml = rv_xml && |<BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY><OBJ_KEY>AAwphY1KHuW243oCDtv6Gg==</OBJ_KEY>|.
-    rv_xml = rv_xml && |<NODE_NAME>ROOT_MESSAGE</NODE_NAME><NODE_ESR_NAME/><NODE_ESR_PREFIX/><NODE_GENIL_NAME/>|.
-    rv_xml = rv_xml && |<DATA_TYPE>/BOBF/S_FRW_MESSAGE_K</DATA_TYPE><DATA_DATA_TYPE>/BOBF/S_FRW_MESSAGE_D</DATA_DATA_TYPE>|.
-    rv_xml = rv_xml && |<DATA_DATA_TYPE_T/><DATA_TABLE_TYPE>/BOBF/T_FRW_MESSAGE_K</DATA_TABLE_TYPE><GDT_DATA_TYPE/>|.
-    rv_xml = rv_xml && |<PRX_DAT_DAT_TYPE/><EXT_INCL_NAME/><EXT_INCL_NAME_T/><DATABASE_TABLE/><NODE_TYPE>|.
-    rv_xml = rv_xml && |V</NODE_TYPE><NODE_CAT_KEY/><SP_MAPPER_CLASS/><SP_ID_MAP_CLASS/><BUF_CLASS>/BOBF/CL_LIB_B_MESSAGE</BUF_CLASS>|.
-    rv_xml = rv_xml && |<MAPPER_CLASS/><DELEGATION_CLASS/><LCP_WRAP_CLASS/><LOADABLE/><LOCKABLE/><TRANSIENT>|.
-    rv_xml = rv_xml && |X</TRANSIENT><SUBTREE_PROPERTY/><KEY_INHERITED/><USE_PROXY_TYPE/><NODE_CLASS/><ALIAS_RETRIEVE/>|.
-    rv_xml = rv_xml && |<ALIAS_RETRIEVE_S/><ALIAS_CREATE_S/><ALIAS_UPDATE_S/><ALIAS_DELETE_S/><KEY_SECKEYNAME/>|.
-    rv_xml = rv_xml && |<ROOT_SECKEYNAME/><STA_CHILD_ASSOC/><STA_PARENT_ASSOC/><REF_BO_KEY/><REF_NODE_KEY/>|.
-    rv_xml = rv_xml && |<EXTENDIBLE/><AUTH_CHECK_CLASS/><AUTH_CHECK_RELEVANT/><CREATE_USER>DEVELOPER</CREATE_USER>|.
-    rv_xml = rv_xml && |<CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>|.
-    rv_xml = rv_xml && |20160224173020</CHANGE_TIME></_-BOBF_-OBM_NODE><_-BOBF_-OBM_NODE><NAME>ZABAPGIT_UNITTEST</NAME>|.
-    rv_xml = rv_xml && |<EXTENSION/><VERSION>00000</VERSION><NODE_KEY>AAwphY1KHuW243oCDtyaGg==</NODE_KEY>|.
-    rv_xml = rv_xml && |<BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY><OBJ_KEY>AAwphY1KHuW243oCDtv6Gg==</OBJ_KEY>|.
-    rv_xml = rv_xml && |<NODE_NAME>ROOT_LOCK</NODE_NAME><NODE_ESR_NAME/><NODE_ESR_PREFIX/><NODE_GENIL_NAME/>|.
-    rv_xml = rv_xml && |<DATA_TYPE>/BOBF/S_FRW_LOCK_NODE</DATA_TYPE><DATA_DATA_TYPE>/BOBF/S_FRW_LOCK_NODE_DATA</DATA_DATA_TYPE>|.
-    rv_xml = rv_xml && |<DATA_DATA_TYPE_T/><DATA_TABLE_TYPE>/BOBF/T_FRW_LOCK_NODE</DATA_TABLE_TYPE><GDT_DATA_TYPE/>|.
-    rv_xml = rv_xml && |<PRX_DAT_DAT_TYPE/><EXT_INCL_NAME/><EXT_INCL_NAME_T/><DATABASE_TABLE/><NODE_TYPE>|.
-    rv_xml = rv_xml && |L</NODE_TYPE><NODE_CAT_KEY/><SP_MAPPER_CLASS/><SP_ID_MAP_CLASS/><BUF_CLASS>/BOBF/CL_LIB_B_LOCK</BUF_CLASS>|.
-    rv_xml = rv_xml && |<MAPPER_CLASS/><DELEGATION_CLASS/><LCP_WRAP_CLASS/><LOADABLE/><LOCKABLE/><TRANSIENT>|.
-    rv_xml = rv_xml && |X</TRANSIENT><SUBTREE_PROPERTY/><KEY_INHERITED/><USE_PROXY_TYPE/><NODE_CLASS/><ALIAS_RETRIEVE/>|.
-    rv_xml = rv_xml && |<ALIAS_RETRIEVE_S/><ALIAS_CREATE_S/><ALIAS_UPDATE_S/><ALIAS_DELETE_S/><KEY_SECKEYNAME/>|.
-    rv_xml = rv_xml && |<ROOT_SECKEYNAME/><STA_CHILD_ASSOC/><STA_PARENT_ASSOC/><REF_BO_KEY/><REF_NODE_KEY/>|.
-    rv_xml = rv_xml && |<EXTENDIBLE/><AUTH_CHECK_CLASS/><AUTH_CHECK_RELEVANT/><CREATE_USER>DEVELOPER</CREATE_USER>|.
-    rv_xml = rv_xml && |<CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>|.
-    rv_xml = rv_xml && |20160224173020</CHANGE_TIME></_-BOBF_-OBM_NODE><_-BOBF_-OBM_NODE><NAME>ZABAPGIT_UNITTEST</NAME>|.
-    rv_xml = rv_xml && |<EXTENSION/><VERSION>00000</VERSION><NODE_KEY>AAwphY1KHuW243oCDt1aGg==</NODE_KEY>|.
-    rv_xml = rv_xml && |<BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY><OBJ_KEY>AAwphY1KHuW243oCDtv6Gg==</OBJ_KEY>|.
-    rv_xml = rv_xml && |<NODE_NAME>ROOT_PROPERTY</NODE_NAME><NODE_ESR_NAME/><NODE_ESR_PREFIX/><NODE_GENIL_NAME/>|.
-    rv_xml = rv_xml && |<DATA_TYPE>/BOBF/S_FRW_PROPERTY_K</DATA_TYPE><DATA_DATA_TYPE>/BOBF/S_FRW_PROPERTY_D</DATA_DATA_TYPE>|.
-    rv_xml = rv_xml && |<DATA_DATA_TYPE_T/><DATA_TABLE_TYPE>/BOBF/T_FRW_PROPERTY_K</DATA_TABLE_TYPE><GDT_DATA_TYPE/>|.
-    rv_xml = rv_xml && |<PRX_DAT_DAT_TYPE/><EXT_INCL_NAME/><EXT_INCL_NAME_T/><DATABASE_TABLE/><NODE_TYPE>|.
-    rv_xml = rv_xml && |F</NODE_TYPE><NODE_CAT_KEY/><SP_MAPPER_CLASS/><SP_ID_MAP_CLASS/><BUF_CLASS>/BOBF/CL_LIB_B_PROPERTY</BUF_CLASS>|.
-    rv_xml = rv_xml && |<MAPPER_CLASS/><DELEGATION_CLASS/><LCP_WRAP_CLASS/><LOADABLE/><LOCKABLE/><TRANSIENT>|.
-    rv_xml = rv_xml && |X</TRANSIENT><SUBTREE_PROPERTY/><KEY_INHERITED/><USE_PROXY_TYPE/><NODE_CLASS/><ALIAS_RETRIEVE/>|.
-    rv_xml = rv_xml && |<ALIAS_RETRIEVE_S/><ALIAS_CREATE_S/><ALIAS_UPDATE_S/><ALIAS_DELETE_S/><KEY_SECKEYNAME/>|.
-    rv_xml = rv_xml && |<ROOT_SECKEYNAME/><STA_CHILD_ASSOC/><STA_PARENT_ASSOC/><REF_BO_KEY/><REF_NODE_KEY/>|.
-    rv_xml = rv_xml && |<EXTENDIBLE/><AUTH_CHECK_CLASS/><AUTH_CHECK_RELEVANT/><CREATE_USER>DEVELOPER</CREATE_USER>|.
-    rv_xml = rv_xml && |<CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER><CHANGE_TIME>|.
-    rv_xml = rv_xml && |20160224173020</CHANGE_TIME></_-BOBF_-OBM_NODE></DATA_TAB></asx:values></asx:abap>|.
-    rv_xml = rv_xml && |</TableContent></_-BOBF_-OBM_NODE><_-BOBF_-OBM_NODET><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>6</POS>|.
-    rv_xml = rv_xml && |<NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_NODET>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_OBJ><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_NODE_field_catalog><_-BOBF_-OBM_NODET>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_NODET><LANGU>E</LANGU><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>|.
+    rv_xml = rv_xml && |00000</VERSION><NODE_KEY>AAwphY1KHuW5jj/mrFfJDA==</NODE_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<DESCRIPTION>Root node</DESCRIPTION></_-BOBF_-OBM_NODET></_-BOBF_-OBM_NODET><_-BOBF_-OBM_NODET_field_catalog>|.
+    rv_xml = rv_xml && |<item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>NAME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>3</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS><NAME>VERSION</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>5</POS><NAME>NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>6</POS><NAME>BO_KEY</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>40</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_NODET_field_catalog><_-BOBF_-OBM_OBJ><_-BOBF_-OBM_OBJ>|.
+    rv_xml = rv_xml && |<NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>00000</VERSION><OBJ_KEY>AAwphY1KHuW5jj/mrFepDA==</OBJ_KEY>|.
+    rv_xml = rv_xml && |<BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY><ROOT_NODE_KEY>AAwphY1KHuW5jj/mrFfJDA==</ROOT_NODE_KEY>|.
+    rv_xml = rv_xml && |<BUFFER_CLASS>/BOBF/CL_BUF_SIMPLE</BUFFER_CLASS><MAPPER_CLASS>/BOBF/CL_DAC_TABLE</MAPPER_CLASS>|.
+    rv_xml = rv_xml && |<SP_MAPPER_CLASS/><SP_CLASS/><CONST_INTERFACE/><ACCESS_CLASS/><STATUS_CLASS/><DERIVATOR_CLASS/>|.
+    rv_xml = rv_xml && |<CLEANUP_MODE>2</CLEANUP_MODE><ENQUEUE_SCOPE>2</ENQUEUE_SCOPE><OBJCAT>0</OBJCAT><PROXY_INCOMPLETE/>|.
+    rv_xml = rv_xml && |<PROXY_CHECKSUM/><PROXY_TIME>0</PROXY_TIME><GENIL_ENABLED/><GENIL_COMP_NAME/><GENIL_PREFIX/>|.
+    rv_xml = rv_xml && |<CHECK_SERVICES>X</CHECK_SERVICES><CHK_SERV_ASSOC>N</CHK_SERV_ASSOC><CHK_SERV_ACTION>|.
+    rv_xml = rv_xml && |N</CHK_SERV_ACTION><FINAL/><EXTENDIBLE/><ABSTRACT/><NAMESPACE/><PREFIX/><TD_CONTAINER/>|.
+    rv_xml = rv_xml && |<AUTH_CHECK_RELEVANT/><ES_RELEVANT/><ES_TEMPLATE/><ES_DATA_EXTRACTOR_CLASS/><LAST_CI_RELEVANT_CHANGE>|.
+    rv_xml = rv_xml && |0</LAST_CI_RELEVANT_CHANGE><LAST_CI_GENERATION>0</LAST_CI_GENERATION><CREATE_USER>|.
+    rv_xml = rv_xml && |DEVELOPER</CREATE_USER><CREATE_TIME>20160307143702</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER>|.
+    rv_xml = rv_xml && |<CHANGE_TIME>20160307143702</CHANGE_TIME><LAST_CHANGE_USER>DEVELOPER</LAST_CHANGE_USER>|.
+    rv_xml = rv_xml && |<LAST_CHANGE_TIME>20160307143702</LAST_CHANGE_TIME></_-BOBF_-OBM_OBJ></_-BOBF_-OBM_OBJ>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_OBJ_field_catalog><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
     rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
@@ -1282,46 +1272,46 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |MAPPER_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY/></item><item><POS>9</POS><NAME>SP_MAPPER_CLASS</NAME><TYPE_KIND>C</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>|.
-    rv_xml = rv_xml && |SP_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>11</POS><NAME>CONST_INTERFACE</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>|.
-    rv_xml = rv_xml && |ACCESS_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>13</POS><NAME>STATUS_CLASS</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>|.
-    rv_xml = rv_xml && |DERIVATOR_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>15</POS><NAME>CLEANUP_MODE</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>|.
-    rv_xml = rv_xml && |ENQUEUE_SCOPE</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>17</POS><NAME>OBJCAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>18</POS><NAME>PROXY_INCOMPLETE</NAME>|.
+    rv_xml = rv_xml && |SP_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>11</POS><NAME>CONST_INTERFACE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>ACCESS_CLASS</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>13</POS><NAME>STATUS_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>DERIVATOR_CLASS</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>15</POS><NAME>CLEANUP_MODE</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>ENQUEUE_SCOPE</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>N</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item>|.
+    rv_xml = rv_xml && |<POS>17</POS><NAME>OBJCAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>18</POS><NAME>PROXY_INCOMPLETE</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>19</POS>|.
+    rv_xml = rv_xml && |<NAME>PROXY_CHECKSUM</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>40</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>20</POS><NAME>PROXY_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>21</POS><NAME>|.
+    rv_xml = rv_xml && |GENIL_ENABLED</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>22</POS><NAME>GENIL_COMP_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>6</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>23</POS><NAME>|.
+    rv_xml = rv_xml && |GENIL_PREFIX</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>10</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>24</POS><NAME>CHECK_SERVICES</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>25</POS><NAME>|.
+    rv_xml = rv_xml && |CHK_SERV_ASSOC</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>26</POS><NAME>CHK_SERV_ACTION</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>27</POS><NAME>|.
+    rv_xml = rv_xml && |FINAL</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>28</POS><NAME>EXTENDIBLE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>29</POS><NAME>ABSTRACT</NAME>|.
     rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item>|.
-    rv_xml = rv_xml && |<POS>19</POS><NAME>PROXY_CHECKSUM</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>40</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>20</POS><NAME>PROXY_TIME</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>21</POS><NAME>GENIL_ENABLED</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>22</POS><NAME>GENIL_COMP_NAME</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>6</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item>|.
-    rv_xml = rv_xml && |<POS>23</POS><NAME>GENIL_PREFIX</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>10</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>24</POS><NAME>CHECK_SERVICES</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>25</POS><NAME>CHK_SERV_ASSOC</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>26</POS><NAME>CHK_SERV_ACTION</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item>|.
-    rv_xml = rv_xml && |<POS>27</POS><NAME>FINAL</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>28</POS><NAME>EXTENDIBLE</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>29</POS>|.
-    rv_xml = rv_xml && |<NAME>ABSTRACT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>30</POS><NAME>NAMESPACE</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>10</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>31</POS><NAME>|.
-    rv_xml = rv_xml && |PREFIX</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>10</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
-    rv_xml = rv_xml && |</item><item><POS>32</POS><NAME>TD_CONTAINER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>33</POS><NAME>AUTH_CHECK_RELEVANT</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>34</POS><NAME>ES_RELEVANT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>35</POS><NAME>ES_TEMPLATE</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>19</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>36</POS><NAME>ES_DATA_EXTRACTOR_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>37</POS><NAME>LAST_CI_RELEVANT_CHANGE</NAME>|.
+    rv_xml = rv_xml && |<POS>30</POS><NAME>NAMESPACE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>10</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>31</POS><NAME>PREFIX</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>10</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>32</POS><NAME>|.
+    rv_xml = rv_xml && |TD_CONTAINER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>33</POS><NAME>AUTH_CHECK_RELEVANT</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>34</POS><NAME>|.
+    rv_xml = rv_xml && |ES_RELEVANT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>35</POS><NAME>ES_TEMPLATE</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>19</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>36</POS><NAME>|.
+    rv_xml = rv_xml && |ES_DATA_EXTRACTOR_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>37</POS><NAME>LAST_CI_RELEVANT_CHANGE</NAME>|.
     rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
     rv_xml = rv_xml && |<item><POS>38</POS><NAME>LAST_CI_GENERATION</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>|.
     rv_xml = rv_xml && |15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>39</POS><NAME>CREATE_USER</NAME>|.
@@ -1332,25 +1322,12 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |<item><POS>42</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
     rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>43</POS><NAME>LAST_CHANGE_USER</NAME>|.
     rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>44</POS><NAME>LAST_CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap>|.
-    rv_xml = rv_xml && |</FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB><_-BOBF_-OBM_OBJ><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/>|.
-    rv_xml = rv_xml && |<VERSION>00000</VERSION><OBJ_KEY>AAwphY1KHuW243oCDtv6Gg==</OBJ_KEY><BO_KEY>AAwphY1KHuW243oCDtvaGg==</BO_KEY>|.
-    rv_xml = rv_xml && |<ROOT_NODE_KEY>AAwphY1KHuW243oCDtwaGg==</ROOT_NODE_KEY><BUFFER_CLASS>/BOBF/CL_BUF_SIMPLE</BUFFER_CLASS>|.
-    rv_xml = rv_xml && |<MAPPER_CLASS>/BOBF/CL_DAC_TABLE</MAPPER_CLASS><SP_MAPPER_CLASS/><SP_CLASS/><CONST_INTERFACE>|.
-    rv_xml = rv_xml && |ZIF_AGUT_ZABAPGIT_UNITTEST_C</CONST_INTERFACE><ACCESS_CLASS/><STATUS_CLASS/><DERIVATOR_CLASS/>|.
-    rv_xml = rv_xml && |<CLEANUP_MODE>2</CLEANUP_MODE><ENQUEUE_SCOPE>2</ENQUEUE_SCOPE><OBJCAT>0</OBJCAT><PROXY_INCOMPLETE/>|.
-    rv_xml = rv_xml && |<PROXY_CHECKSUM/><PROXY_TIME>0</PROXY_TIME><GENIL_ENABLED/><GENIL_COMP_NAME/><GENIL_PREFIX/>|.
-    rv_xml = rv_xml && |<CHECK_SERVICES>X</CHECK_SERVICES><CHK_SERV_ASSOC>N</CHK_SERV_ASSOC><CHK_SERV_ACTION>|.
-    rv_xml = rv_xml && |N</CHK_SERV_ACTION><FINAL/><EXTENDIBLE/><ABSTRACT/><NAMESPACE/><PREFIX/><TD_CONTAINER/>|.
-    rv_xml = rv_xml && |<AUTH_CHECK_RELEVANT/><ES_RELEVANT/><ES_TEMPLATE/><ES_DATA_EXTRACTOR_CLASS/><LAST_CI_RELEVANT_CHANGE>|.
-    rv_xml = rv_xml && |0</LAST_CI_RELEVANT_CHANGE><LAST_CI_GENERATION>0</LAST_CI_GENERATION><CREATE_USER>|.
-    rv_xml = rv_xml && |DEVELOPER</CREATE_USER><CREATE_TIME>20160224173020</CREATE_TIME><CHANGE_USER>DEVELOPER</CHANGE_USER>|.
-    rv_xml = rv_xml && |<CHANGE_TIME>20160224173020</CHANGE_TIME><LAST_CHANGE_USER>DEVELOPER</LAST_CHANGE_USER>|.
-    rv_xml = rv_xml && |<LAST_CHANGE_TIME>20160224173020</LAST_CHANGE_TIME></_-BOBF_-OBM_OBJ></DATA_TAB></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></TableContent></_-BOBF_-OBM_OBJ><_-BOBF_-OBM_OBJT><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<item><POS>44</POS><NAME>LAST_CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_OBJ_field_catalog><_-BOBF_-OBM_OBJT>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_OBJT><LANGU>E</LANGU><NAME>ZABAPGIT_UNITTEST</NAME><EXTENSION/><VERSION>|.
+    rv_xml = rv_xml && |00000</VERSION><OBJ_KEY>AAwphY1KHuW5jj/mrFepDA==</OBJ_KEY><BO_KEY>AAwphY1KHuW5jj/mrFeJDA==</BO_KEY>|.
+    rv_xml = rv_xml && |<DESCRIPTION>Demo object for complete roundtrip</DESCRIPTION></_-BOBF_-OBM_OBJT></_-BOBF_-OBM_OBJT>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_OBJT_field_catalog><item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
     rv_xml = rv_xml && |<NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND>|.
@@ -1360,73 +1337,61 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>6</POS>|.
     rv_xml = rv_xml && |<NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB><_-BOBF_-OBM_OBJT><LANGU>E</LANGU><NAME>ZABAPGIT_UNITTEST</NAME>|.
-    rv_xml = rv_xml && |<EXTENSION/><VERSION>00000</VERSION><OBJ_KEY>AAwphY1KHuW243oCDtv6Gg==</OBJ_KEY><BO_KEY>|.
-    rv_xml = rv_xml && |AAwphY1KHuW243oCDtvaGg==</BO_KEY><DESCRIPTION>Demoobjectforcompleteroundtrip</DESCRIPTION>|.
-    rv_xml = rv_xml && |</_-BOBF_-OBM_OBJT></DATA_TAB></asx:values></asx:abap></TableContent></_-BOBF_-OBM_OBJT>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_RTW><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>RTW_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |ACCESS_CAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>CONTENT_CAT</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>|.
-    rv_xml = rv_xml && |CONTENT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_OBJT_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_RTW/><_-BOBF_-OBM_RTW_field_catalog><item><POS>1</POS><NAME>NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>RTW_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>6</POS><NAME>ACCESS_CAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>CONTENT_CAT</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS>|.
+    rv_xml = rv_xml && |<NAME>CONTENT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY/></item><item><POS>9</POS><NAME>NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
     rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>ASSOC_KEY</NAME>|.
     rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
     rv_xml = rv_xml && |<item><POS>11</POS><NAME>TRIGGER_CREATE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
     rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>TRIGGER_UPDATE</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>13</POS><NAME>TRIGGER_DELETE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item>|.
+    rv_xml = rv_xml && |<POS>13</POS><NAME>TRIGGER_DELETE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
     rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>TRIGGER_CHECK</NAME>|.
     rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item>|.
-    rv_xml = rv_xml && |<POS>15</POS><NAME>TRIGGER_LOAD</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>TRIGGER_PROPERTY</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>17</POS><NAME>TRIGGER_LOCK</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>18</POS><NAME>TRIGGER_RETRIEVE</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item>|.
-    rv_xml = rv_xml && |<POS>19</POS><NAME>MODELED_ONLY</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>20</POS><NAME>CREATE_USER</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |21</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>22</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |23</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog>|.
-    rv_xml = rv_xml && |<TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_RTW><_-BOBF_-VAL_CONF>|.
-    rv_xml = rv_xml && |<FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>|.
-    rv_xml = rv_xml && |EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>CONF_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |ACT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
-    rv_xml = rv_xml && |</item><item><POS>7</POS><NAME>VAL_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>NODE_CAT_KEY</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>9</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>CREATE_TIME</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>11</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>CHANGE_TIME</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |</FIELD_CATALOG></asx:values></asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-VAL_CONF>|.
-    rv_xml = rv_xml && |<_-BOBF_-VAL_LIST><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<POS>15</POS><NAME>TRIGGER_LOAD</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>TRIGGER_PROPERTY</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>17</POS>|.
+    rv_xml = rv_xml && |<NAME>TRIGGER_LOCK</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>18</POS><NAME>TRIGGER_RETRIEVE</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>19</POS><NAME>|.
+    rv_xml = rv_xml && |MODELED_ONLY</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>20</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>21</POS><NAME>|.
+    rv_xml = rv_xml && |CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>22</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>23</POS><NAME>|.
+    rv_xml = rv_xml && |CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item></_-BOBF_-OBM_RTW_field_catalog><_-BOBF_-VAL_CONF/><_-BOBF_-VAL_CONF_field_catalog>|.
+    rv_xml = rv_xml && |<item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS><NAME>CONF_KEY</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>ACT_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>|.
+    rv_xml = rv_xml && |VAL_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>8</POS><NAME>NODE_CAT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>CREATE_USER</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>10</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>CHANGE_USER</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>12</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-VAL_CONF_field_catalog><_-BOBF_-VAL_LIST/>|.
+    rv_xml = rv_xml && |<_-BOBF_-VAL_LIST_field_catalog><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
     rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
@@ -1457,10 +1422,7 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |<IS_KEY/></item><item><POS>20</POS><NAME>VAL_SUB_CAT</NAME><TYPE_KIND>C</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>21</POS><NAME>|.
     rv_xml = rv_xml && |SIMPLIFIED_DT_TAG</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog><TableContent>|.
-    rv_xml = rv_xml && |<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA_TAB/>|.
-    rv_xml = rv_xml && |</asx:values></asx:abap></TableContent></_-BOBF_-VAL_LIST><_-BOBF_-VAL_LISTT><FieldCatalog>|.
-    rv_xml = rv_xml && |<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><FIELD_CATALOG>|.
+    rv_xml = rv_xml && |<IS_KEY/></item></_-BOBF_-VAL_LIST_field_catalog><_-BOBF_-VAL_LISTT/><_-BOBF_-VAL_LISTT_field_catalog>|.
     rv_xml = rv_xml && |<item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
     rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>NAME</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
@@ -1471,33 +1433,27 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>6</POS><NAME>BO_KEY</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
     rv_xml = rv_xml && |7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>40</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog>|.
-    rv_xml = rv_xml && |<TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-VAL_LISTT><_-BOBF_-VAL_NET>|.
-    rv_xml = rv_xml && |<FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>|.
-    rv_xml = rv_xml && |EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>NET_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |VAL_KEY_FROM</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>VAL_KEY_TO</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>|.
-    rv_xml = rv_xml && |CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>9</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>|.
-    rv_xml = rv_xml && |CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>11</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-VAL_NET><_-BOBF_-OBM_PROPTY>|.
-    rv_xml = rv_xml && |<FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>|.
-    rv_xml = rv_xml && |EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></_-BOBF_-VAL_LISTT_field_catalog><_-BOBF_-VAL_NET/><_-BOBF_-VAL_NET_field_catalog>|.
+    rv_xml = rv_xml && |<item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS><NAME>NET_KEY</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>VAL_KEY_FROM</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |7</POS><NAME>VAL_KEY_TO</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>CREATE_USER</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |9</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |11</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></_-BOBF_-VAL_NET_field_catalog><_-BOBF_-OBM_PROPTY/>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_PROPTY_field_catalog><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
+    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
     rv_xml = rv_xml && |<NAME>PROPERTY_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
@@ -1509,40 +1465,37 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>256</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
     rv_xml = rv_xml && |<item><POS>9</POS><NAME>PROPERTY_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
     rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>PROPERTY_VALUE</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>11</POS><NAME>FINAL</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item>|.
+    rv_xml = rv_xml && |<POS>11</POS><NAME>FINAL</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
     rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>CREATE_USER</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
     rv_xml = rv_xml && |13</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
     rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
     rv_xml = rv_xml && |15</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog>|.
-    rv_xml = rv_xml && |<TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_PROPTY><_-BOBF_-OBM_ALTKEY>|.
-    rv_xml = rv_xml && |<FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>|.
-    rv_xml = rv_xml && |EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>|.
-    rv_xml = rv_xml && |X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS><NAME>|.
-    rv_xml = rv_xml && |ALTKEY_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_PROPTY_field_catalog><_-BOBF_-OBM_ALTKEY/>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_ALTKEY_field_catalog><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
+    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
+    rv_xml = rv_xml && |<NAME>ALTKEY_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>ALTKEY_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>|.
-    rv_xml = rv_xml && |ALTKEY_ESR_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>9</POS><NAME>DATA_TYPE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>DATA_TABLE_TYPE</NAME>|.
+    rv_xml = rv_xml && |NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>7</POS><NAME>ALTKEY_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>ALTKEY_ESR_NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>9</POS><NAME>DATA_TYPE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>DATA_TABLE_TYPE</NAME>|.
     rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
     rv_xml = rv_xml && |<item><POS>11</POS><NAME>PRX_DATA_TYPE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
     rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>QUERY_KEY</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
     rv_xml = rv_xml && |13</POS><NAME>SECKEYNAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
     rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>NOT_UNIQUE</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |15</POS><NAME>SP_MAPPER_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>15</POS>|.
+    rv_xml = rv_xml && |<NAME>SP_MAPPER_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
     rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>ALIAS_ALTKEY</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
     rv_xml = rv_xml && |17</POS><NAME>ALIAS_ALTKEY_S</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
@@ -1550,52 +1503,46 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>19</POS>|.
     rv_xml = rv_xml && |<NAME>ALTKEY_NAME_AIE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
     rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>20</POS><NAME>UNIQUE_CHECK_AIE</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |21</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>22</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |23</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>24</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG>|.
-    rv_xml = rv_xml && |</asx:values></asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_ALTKEY>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_ALTKET><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>ALTKEY_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>6</POS>|.
-    rv_xml = rv_xml && |<NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_ALTKET>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_QUERY><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>QUERY_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>QUERY_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>|.
-    rv_xml = rv_xml && |QUERY_ESR_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>9</POS><NAME>QUERY_GENIL_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>18</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>|.
-    rv_xml = rv_xml && |DATA_TYPE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>11</POS><NAME>PRX_DATA_TYPE</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>|.
-    rv_xml = rv_xml && |QUERY_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>13</POS><NAME>ALIAS_QUERY</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>|.
-    rv_xml = rv_xml && |SP_MAPPER_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>15</POS><NAME>QUERY_CAT</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>21</POS>|.
+    rv_xml = rv_xml && |<NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>22</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>23</POS><NAME>|.
+    rv_xml = rv_xml && |CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>24</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_ALTKEY_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_ALTKET/><_-BOBF_-OBM_ALTKET_field_catalog><item><POS>1</POS><NAME>LANGU</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>EXTENSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>ALTKEY_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>6</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_ALTKET_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_QUERY/><_-BOBF_-OBM_QUERY_field_catalog><item><POS>1</POS><NAME>NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>QUERY_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>6</POS><NAME>NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>QUERY_NAME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |8</POS><NAME>QUERY_ESR_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>QUERY_GENIL_NAME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>18</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |10</POS><NAME>DATA_TYPE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>PRX_DATA_TYPE</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |12</POS><NAME>QUERY_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>13</POS><NAME>ALIAS_QUERY</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |14</POS><NAME>SP_MAPPER_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>15</POS><NAME>QUERY_CAT</NAME><TYPE_KIND>C</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>|.
     rv_xml = rv_xml && |USE_PROXY_TYPE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY/></item><item><POS>17</POS><NAME>TD_CONTAINER</NAME><TYPE_KIND>C</TYPE_KIND>|.
@@ -1611,85 +1558,74 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>24</POS><NAME>|.
     rv_xml = rv_xml && |CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY/></item><item><POS>25</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_QUERY>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_QUERYT><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>QUERY_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>6</POS>|.
-    rv_xml = rv_xml && |<NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_QUERYT>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_ASSOCB><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>ASSOCB_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |ASSOC_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>ATTRIBUTE_CAT</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>|.
-    rv_xml = rv_xml && |ATTRIBUTE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>256</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>9</POS><NAME>FROM_BINDING_CAT</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>|.
-    rv_xml = rv_xml && |FROM_BINDING</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>256</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_QUERY_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_QUERYT/><_-BOBF_-OBM_QUERYT_field_catalog><item><POS>1</POS><NAME>LANGU</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>EXTENSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>QUERY_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>6</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_QUERYT_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_ASSOCB/><_-BOBF_-OBM_ASSOCB_field_catalog><item><POS>1</POS><NAME>NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>ASSOCB_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>6</POS><NAME>ASSOC_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>ATTRIBUTE_CAT</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item>|.
+    rv_xml = rv_xml && |<POS>8</POS><NAME>ATTRIBUTE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>256</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>FROM_BINDING_CAT</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS>|.
+    rv_xml = rv_xml && |<NAME>FROM_BINDING</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>256</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY/></item><item><POS>11</POS><NAME>TO_BINDING_CAT</NAME><TYPE_KIND>C</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>|.
     rv_xml = rv_xml && |TO_BINDING</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>256</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY/></item><item><POS>13</POS><NAME>SIGN</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
     rv_xml = rv_xml && |2</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>CONST_INTERFACE</NAME>|.
     rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>15</POS><NAME>DATA_ACCESS_RELE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>ALTKEY</NAME>|.
+    rv_xml = rv_xml && |<item><POS>15</POS><NAME>DATA_ACCESS_RELE</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>ALTKEY</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |17</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>18</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |19</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>20</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_ASSOCB_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_PRXPTY/><_-BOBF_-OBM_PRXPTY_field_catalog><item><POS>1</POS><NAME>NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>PROPERTY_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>|.
+    rv_xml = rv_xml && |BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>6</POS><NAME>CONTENT_CAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>CONTENT_KEY</NAME>|.
     rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>17</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>18</POS><NAME>CREATE_TIME</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>19</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>20</POS><NAME>CHANGE_TIME</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |</FIELD_CATALOG></asx:values></asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_ASSOCB>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_PRXPTY><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>PROPERTY_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |CONTENT_CAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>CONTENT_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>|.
-    rv_xml = rv_xml && |HIERARCHY_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>9</POS><NAME>ATTRIBUTE_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>|.
-    rv_xml = rv_xml && |PROPERTY_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>11</POS><NAME>PROPERTY_VALUE</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>|.
-    rv_xml = rv_xml && |FINAL</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
-    rv_xml = rv_xml && |</item><item><POS>13</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>CREATE_TIME</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>15</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>CHANGE_TIME</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |</FIELD_CATALOG></asx:values></asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_PRXPTY>|.
-    rv_xml = rv_xml && |<_-BOBF_-STA_SCHEMA><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<item><POS>8</POS><NAME>HIERARCHY_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>ATTRIBUTE_NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>10</POS><NAME>PROPERTY_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>PROPERTY_VALUE</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item>|.
+    rv_xml = rv_xml && |<POS>12</POS><NAME>FINAL</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>13</POS><NAME>CREATE_USER</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |14</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>15</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |16</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_PRXPTY_field_catalog><_-BOBF_-STA_SCHEMA/>|.
+    rv_xml = rv_xml && |<_-BOBF_-STA_SCHEMA_field_catalog><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
     rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
@@ -1697,35 +1633,29 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |<NAME>STA_SCHEMA_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>SCHEMA_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>|.
-    rv_xml = rv_xml && |SCHEMA_ESR_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>9</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>|.
-    rv_xml = rv_xml && |CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>11</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>|.
-    rv_xml = rv_xml && |CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog><TableContent>|.
-    rv_xml = rv_xml && |<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA_TAB/>|.
-    rv_xml = rv_xml && |</asx:values></asx:abap></TableContent></_-BOBF_-STA_SCHEMA><_-BOBF_-STA_SCHEMT>|.
-    rv_xml = rv_xml && |<FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<FIELD_CATALOG><item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>|.
-    rv_xml = rv_xml && |NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>|.
-    rv_xml = rv_xml && |X</IS_KEY></item><item><POS>3</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>STA_SCHEMA_KEY</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
-    rv_xml = rv_xml && |<POS>6</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG>|.
-    rv_xml = rv_xml && |</asx:values></asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-STA_SCHEMT>|.
-    rv_xml = rv_xml && |<_-BOBF_-STA_DERIV><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>7</POS><NAME>SCHEMA_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>SCHEMA_ESR_NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>9</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>CREATE_TIME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>11</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>CHANGE_TIME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |</_-BOBF_-STA_SCHEMA_field_catalog><_-BOBF_-STA_SCHEMT/><_-BOBF_-STA_SCHEMT_field_catalog>|.
+    rv_xml = rv_xml && |<item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>NAME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>3</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS><NAME>VERSION</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>5</POS><NAME>STA_SCHEMA_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>6</POS><NAME>BO_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>40</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-STA_SCHEMT_field_catalog><_-BOBF_-STA_DERIV/>|.
+    rv_xml = rv_xml && |<_-BOBF_-STA_DERIV_field_catalog><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
     rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
@@ -1733,26 +1663,23 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |<NAME>STA_DERIV_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>DERIV_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>|.
-    rv_xml = rv_xml && |DERIV_ESR_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>9</POS><NAME>DERIVATOR_CAT</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>|.
-    rv_xml = rv_xml && |DERIVATOR_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>11</POS><NAME>TD_CONTAINER</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>|.
-    rv_xml = rv_xml && |TD_CONTAINER_VAR</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>13</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>|.
-    rv_xml = rv_xml && |CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>15</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>|.
-    rv_xml = rv_xml && |CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog><TableContent>|.
-    rv_xml = rv_xml && |<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA_TAB/>|.
-    rv_xml = rv_xml && |</asx:values></asx:abap></TableContent></_-BOBF_-STA_DERIV><_-BOBF_-STA_DERIVT><FieldCatalog>|.
-    rv_xml = rv_xml && |<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><FIELD_CATALOG>|.
+    rv_xml = rv_xml && |NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>7</POS><NAME>DERIV_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>DERIV_ESR_NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>9</POS><NAME>DERIVATOR_CAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>DERIVATOR_CLASS</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>11</POS><NAME>TD_CONTAINER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>TD_CONTAINER_VAR</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>13</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>CREATE_TIME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>15</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>CHANGE_TIME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |</_-BOBF_-STA_DERIV_field_catalog><_-BOBF_-STA_DERIVT/><_-BOBF_-STA_DERIVT_field_catalog>|.
     rv_xml = rv_xml && |<item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
     rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>NAME</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
@@ -1763,35 +1690,29 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>6</POS><NAME>BO_KEY</NAME>|.
     rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
     rv_xml = rv_xml && |<item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>40</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog>|.
-    rv_xml = rv_xml && |<TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-STA_DERIVT><_-BOBF_-STA_VAR>|.
-    rv_xml = rv_xml && |<FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>|.
-    rv_xml = rv_xml && |EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-STA_DERIVT_field_catalog><_-BOBF_-STA_VAR/>|.
+    rv_xml = rv_xml && |<_-BOBF_-STA_VAR_field_catalog><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
+    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
     rv_xml = rv_xml && |<NAME>STA_VAR_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>STA_VAR_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>|.
-    rv_xml = rv_xml && |STA_VAR_ESR_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>9</POS><NAME>STA_VAR_CAT</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>|.
-    rv_xml = rv_xml && |ATTRIBUTE_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>256</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>11</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>|.
-    rv_xml = rv_xml && |CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>13</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>|.
-    rv_xml = rv_xml && |CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog><TableContent>|.
-    rv_xml = rv_xml && |<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA_TAB/>|.
-    rv_xml = rv_xml && |</asx:values></asx:abap></TableContent></_-BOBF_-STA_VAR><_-BOBF_-STA_VART><FieldCatalog>|.
-    rv_xml = rv_xml && |<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><FIELD_CATALOG>|.
+    rv_xml = rv_xml && |NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>7</POS><NAME>STA_VAR_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>STA_VAR_ESR_NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>9</POS><NAME>STA_VAR_CAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>ATTRIBUTE_NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>256</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>11</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>CREATE_TIME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>13</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>CHANGE_TIME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |</_-BOBF_-STA_VAR_field_catalog><_-BOBF_-STA_VART/><_-BOBF_-STA_VART_field_catalog>|.
     rv_xml = rv_xml && |<item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
     rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>NAME</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
@@ -1802,44 +1723,38 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>6</POS><NAME>BO_KEY</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
     rv_xml = rv_xml && |7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>40</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog>|.
-    rv_xml = rv_xml && |<TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-STA_VART><_-BOBF_-OBM_VSET>|.
-    rv_xml = rv_xml && |<FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>|.
-    rv_xml = rv_xml && |EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>VSET_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |CONTENT_CAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>CONTENT_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>|.
-    rv_xml = rv_xml && |VSET_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>9</POS><NAME>VSET_ESR_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>255</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>|.
-    rv_xml = rv_xml && |VSET_CAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
-    rv_xml = rv_xml && |</item><item><POS>11</POS><NAME>VALUE_SET_CLASS</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>NODE_KEY</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>13</POS><NAME>ASSOC_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>CODE_CIF_NAME</NAME>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></_-BOBF_-STA_VART_field_catalog><_-BOBF_-OBM_VSET/><_-BOBF_-OBM_VSET_field_catalog>|.
+    rv_xml = rv_xml && |<item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS><NAME>VSET_KEY</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item>|.
+    rv_xml = rv_xml && |<POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>CONTENT_CAT</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS>|.
+    rv_xml = rv_xml && |<NAME>CONTENT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>8</POS><NAME>VSET_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>VSET_ESR_NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>255</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>10</POS><NAME>VSET_CAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>VALUE_SET_CLASS</NAME>|.
     rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>15</POS><NAME>TD_CONTAINER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>16</POS><NAME>TD_CONTAINER_VAR</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>17</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>18</POS><NAME>CREATE_TIME</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>19</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>20</POS><NAME>CHANGE_TIME</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |</FIELD_CATALOG></asx:values></asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_VSET>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_VSETT><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<item><POS>12</POS><NAME>NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>13</POS><NAME>ASSOC_KEY</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |14</POS><NAME>CODE_CIF_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>15</POS><NAME>TD_CONTAINER</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |16</POS><NAME>TD_CONTAINER_VAR</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>17</POS><NAME>CREATE_USER</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |18</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>19</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |20</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_VSET_field_catalog><_-BOBF_-OBM_VSETT/>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_VSETT_field_catalog><item><POS>1</POS><NAME>LANGU</NAME><TYPE_KIND>C</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
     rv_xml = rv_xml && |<NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND>|.
@@ -1849,144 +1764,123 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>6</POS>|.
     rv_xml = rv_xml && |<NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>DESCRIPTION</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_VSETT>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_RTW_A><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>CONF_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |RTW_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
-    rv_xml = rv_xml && |</item><item><POS>7</POS><NAME>ATTRIBUTE_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |256</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>ACCESS_CAT</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item>|.
-    rv_xml = rv_xml && |<POS>9</POS><NAME>CONTENT_CAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>CREATE_USER</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |11</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |13</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog>|.
-    rv_xml = rv_xml && |<TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_RTW_A><_-BOBF_-OBM_CODE_L>|.
-    rv_xml = rv_xml && |<FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>|.
-    rv_xml = rv_xml && |EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>VSET_CL_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |VSET_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>CODE_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>|.
-    rv_xml = rv_xml && |CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>9</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>|.
+    rv_xml = rv_xml && |<LENGTH>40</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_VSETT_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_RTW_A/><_-BOBF_-OBM_RTW_A_field_catalog><item><POS>1</POS><NAME>NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>CONF_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>6</POS><NAME>RTW_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>ATTRIBUTE_NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>256</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>8</POS><NAME>ACCESS_CAT</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>CONTENT_CAT</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS>|.
+    rv_xml = rv_xml && |<NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>11</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>|.
     rv_xml = rv_xml && |CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>11</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values>|.
-    rv_xml = rv_xml && |</asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_CODE_L>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_GEN_IN><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>GEN_INFO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
-    rv_xml = rv_xml && |CONTENT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>CONTENT_CAT</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>GENERATE_TYPE</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>b</TYPE_KIND><LENGTH>3</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>9</POS><NAME>GENERATE_VARIANT</NAME><TYPE_KIND>b</TYPE_KIND><LENGTH>3</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>TEMPL_VERSION</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>I</TYPE_KIND><LENGTH>10</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>11</POS><NAME>RELEV_CHANGES</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>CREATE_USER</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>13</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>CHANGE_USER</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>15</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog>|.
-    rv_xml = rv_xml && |<TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_GEN_IN><_-BOBF_-OBM_DISEL>|.
-    rv_xml = rv_xml && |<FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>|.
-    rv_xml = rv_xml && |EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>DISABLED_EL_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |6</POS><NAME>CONTENT_NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>CONTENT_KEY</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>13</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_RTW_A_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_CODE_L/><_-BOBF_-OBM_CODE_L_field_catalog><item><POS>1</POS><NAME>NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>VSET_CL_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>|.
+    rv_xml = rv_xml && |BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>6</POS><NAME>VSET_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>CODE_NAME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
     rv_xml = rv_xml && |8</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>|.
     rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
     rv_xml = rv_xml && |10</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>|.
     rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG>|.
-    rv_xml = rv_xml && |</asx:values></asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_DISEL>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_FINORD><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>FINALIZE_NET_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |6</POS><NAME>PREDECESSOR_BO</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>SUCCESSOR_BO</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |8</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_CODE_L_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_GEN_IN/><_-BOBF_-OBM_GEN_IN_field_catalog><item><POS>1</POS><NAME>NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>GEN_INFO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>|.
+    rv_xml = rv_xml && |BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>6</POS><NAME>CONTENT_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>CONTENT_CAT</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item>|.
+    rv_xml = rv_xml && |<POS>8</POS><NAME>GENERATE_TYPE</NAME><TYPE_KIND>b</TYPE_KIND><LENGTH>3</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>GENERATE_VARIANT</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |b</TYPE_KIND><LENGTH>3</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS>|.
+    rv_xml = rv_xml && |<NAME>TEMPL_VERSION</NAME><TYPE_KIND>I</TYPE_KIND><LENGTH>10</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>11</POS><NAME>RELEV_CHANGES</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>12</POS><NAME>|.
+    rv_xml = rv_xml && |CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>13</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>|.
+    rv_xml = rv_xml && |CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>15</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_GEN_IN_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_DISEL/><_-BOBF_-OBM_DISEL_field_catalog><item><POS>1</POS><NAME>NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>DISABLED_EL_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>|.
+    rv_xml = rv_xml && |BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>6</POS><NAME>CONTENT_NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>CONTENT_KEY</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>8</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
     rv_xml = rv_xml && |10</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>|.
     rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG>|.
-    rv_xml = rv_xml && |</asx:values></asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_FINORD>|.
-    rv_xml = rv_xml && |<_-BOBF_-OBM_SUBSCR><FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
-    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
-    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
-    rv_xml = rv_xml && |<NAME>SUBSCR_NET_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>BO_KEY</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |6</POS><NAME>OBSERVED_BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>CREATE_USER</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |8</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_DISEL_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_FINORD/><_-BOBF_-OBM_FINORD_field_catalog><item><POS>1</POS><NAME>NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>FINALIZE_NET_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>|.
+    rv_xml = rv_xml && |BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>6</POS><NAME>PREDECESSOR_BO</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>SUCCESSOR_BO</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>8</POS><NAME>CREATE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |10</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>11</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_FINORD_field_catalog>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_SUBSCR/><_-BOBF_-OBM_SUBSCR_field_catalog><item><POS>1</POS><NAME>NAME</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>2</POS><NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>N</TYPE_KIND><LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY>|.
+    rv_xml = rv_xml && |</item><item><POS>4</POS><NAME>SUBSCR_NET_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>|.
+    rv_xml = rv_xml && |BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>6</POS><NAME>OBSERVED_BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
+    rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>7</POS><NAME>CREATE_USER</NAME>|.
+    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
+    rv_xml = rv_xml && |<item><POS>8</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>9</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>|.
     rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
     rv_xml = rv_xml && |10</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
-    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog>|.
-    rv_xml = rv_xml && |<TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_SUBSCR><_-BOBF_-ACF_MAP>|.
-    rv_xml = rv_xml && |<FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>|.
-    rv_xml = rv_xml && |EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>|.
-    rv_xml = rv_xml && |X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS><NAME>|.
-    rv_xml = rv_xml && |ACF_MAP_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_SUBSCR_field_catalog><_-BOBF_-ACF_MAP/>|.
+    rv_xml = rv_xml && |<_-BOBF_-ACF_MAP_field_catalog><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
+    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
+    rv_xml = rv_xml && |<NAME>ACF_MAP_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>ACF</NAME><TYPE_KIND>C</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>10</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
     rv_xml = rv_xml && |AUTH_OBJ_NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>10</LENGTH><DECIMALS>0</DECIMALS>|.
@@ -2003,36 +1897,30 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>CHANGE_USER</NAME>|.
     rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
     rv_xml = rv_xml && |<item><POS>15</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog>|.
-    rv_xml = rv_xml && |<TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-ACF_MAP><_-BOBF_-AUTH_OBJ>|.
-    rv_xml = rv_xml && |<FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>|.
-    rv_xml = rv_xml && |EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>|.
-    rv_xml = rv_xml && |X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS><NAME>|.
-    rv_xml = rv_xml && |AUTH_OBJ_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>AUTH_OBJ_NAME</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>10</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
-    rv_xml = rv_xml && |6</POS><NAME>BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
-    rv_xml = rv_xml && |<IS_KEY/></item><item><POS>7</POS><NAME>NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>CREATE_USER</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>9</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>CHANGE_USER</NAME>|.
-    rv_xml = rv_xml && |<TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item>|.
-    rv_xml = rv_xml && |<item><POS>11</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH>|.
-    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG></asx:values></asx:abap></FieldCatalog>|.
-    rv_xml = rv_xml && |<TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-AUTH_OBJ><_-BOBF_-OBM_AK_FLD>|.
-    rv_xml = rv_xml && |<FieldCatalog><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values>|.
-    rv_xml = rv_xml && |<FIELD_CATALOG><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS><NAME>|.
-    rv_xml = rv_xml && |EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>|.
-    rv_xml = rv_xml && |X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND><LENGTH>|.
-    rv_xml = rv_xml && |5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS><NAME>|.
-    rv_xml = rv_xml && |AK_FIELD_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-ACF_MAP_field_catalog><_-BOBF_-AUTH_OBJ/>|.
+    rv_xml = rv_xml && |<_-BOBF_-AUTH_OBJ_field_catalog><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
+    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
+    rv_xml = rv_xml && |<NAME>AUTH_OBJ_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>AUTH_OBJ_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>10</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
+    rv_xml = rv_xml && |BO_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
+    rv_xml = rv_xml && |</item><item><POS>7</POS><NAME>NODE_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH>|.
+    rv_xml = rv_xml && |<DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>8</POS><NAME>CREATE_USER</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |9</POS><NAME>CREATE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>10</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>|.
+    rv_xml = rv_xml && |C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
+    rv_xml = rv_xml && |11</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>|.
+    rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item></_-BOBF_-AUTH_OBJ_field_catalog><_-BOBF_-OBM_AK_FLD/>|.
+    rv_xml = rv_xml && |<_-BOBF_-OBM_AK_FLD_field_catalog><item><POS>1</POS><NAME>NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>2</POS>|.
+    rv_xml = rv_xml && |<NAME>EXTENSION</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>1</LENGTH><DECIMALS>0</DECIMALS>|.
+    rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>3</POS><NAME>VERSION</NAME><TYPE_KIND>N</TYPE_KIND>|.
+    rv_xml = rv_xml && |<LENGTH>5</LENGTH><DECIMALS>0</DECIMALS><IS_KEY>X</IS_KEY></item><item><POS>4</POS>|.
+    rv_xml = rv_xml && |<NAME>AK_FIELD_KEY</NAME><TYPE_KIND>X</TYPE_KIND><LENGTH>16</LENGTH><DECIMALS>0</DECIMALS>|.
     rv_xml = rv_xml && |<IS_KEY>X</IS_KEY></item><item><POS>5</POS><NAME>FIELD_NAME</NAME><TYPE_KIND>C</TYPE_KIND>|.
     rv_xml = rv_xml && |<LENGTH>30</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>6</POS><NAME>|.
     rv_xml = rv_xml && |FIELD_NO</NAME><TYPE_KIND>b</TYPE_KIND><LENGTH>3</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/>|.
@@ -2047,10 +1935,9 @@ CLASS ltcl_bobf IMPLEMENTATION.
     rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item><item><POS>|.
     rv_xml = rv_xml && |13</POS><NAME>CHANGE_USER</NAME><TYPE_KIND>C</TYPE_KIND><LENGTH>12</LENGTH><DECIMALS>|.
     rv_xml = rv_xml && |0</DECIMALS><IS_KEY/></item><item><POS>14</POS><NAME>CHANGE_TIME</NAME><TYPE_KIND>|.
-    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></FIELD_CATALOG>|.
-    rv_xml = rv_xml && |</asx:values></asx:abap></FieldCatalog><TableContent><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">|.
-    rv_xml = rv_xml && |<asx:values><DATA_TAB/></asx:values></asx:abap></TableContent></_-BOBF_-OBM_AK_FLD>|.
-    rv_xml = rv_xml && |</abapGit>|.
+    rv_xml = rv_xml && |P</TYPE_KIND><LENGTH>15</LENGTH><DECIMALS>0</DECIMALS><IS_KEY/></item></_-BOBF_-OBM_AK_FLD_field_catalog>|.
+    rv_xml = rv_xml && |</asx:values></asx:abap></abapGit>|.
+
   ENDMETHOD.
 
 ENDCLASS.

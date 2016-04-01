@@ -33,6 +33,9 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
     DATA lv_objectname      LIKE LINE OF lt_all_objectname.
     DATA lv_obj_type        LIKE LINE OF gt_supported_obj_types.
 
+    gv_serializer_classname = 'ZCL_ABAPGIT_OBJECT_BY_SOBJ'.
+    gv_serializer_version   = '1.0'.
+
     SELECT objectname FROM objh INTO TABLE lt_all_objectname
            WHERE objecttype = 'L'.
 
@@ -81,12 +84,12 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
 
 
   METHOD zif_abapgit_plugin~deserialize.
-    DATA lo_object_container TYPE REF TO lif_external_object_container.
+    DATA lo_object_container TYPE REF TO lcl_abapgit_xml_container.
     DATA lx_obj_exception  TYPE REF TO lcx_obj_exception.
 
-    CREATE OBJECT lo_object_container TYPE lcl_abapgit_st_container
-      EXPORTING
-        io_xml = get_files( )->read_xml( ).
+    CREATE OBJECT lo_object_container.
+
+    lo_object_container->set_xml_input( io_xml ).
 
     TRY.
         get_tlogo_bridge( )->import_object( lo_object_container ).
@@ -113,22 +116,27 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
   ENDMETHOD.
 
 
+  METHOD zif_abapgit_plugin~get_metadata.
+    rs_metadata = get_metadata( ).
+  ENDMETHOD.
+
+
   METHOD zif_abapgit_plugin~jump.
     RETURN.
   ENDMETHOD.
 
 
   METHOD zif_abapgit_plugin~serialize.
-    DATA lo_object_container TYPE REF TO lcl_abapgit_st_container.
+    DATA lo_object_container TYPE REF TO lcl_abapgit_xml_container.
     DATA lx_obj_exception  TYPE REF TO lcx_obj_exception.
 
     TRY.
         IF get_tlogo_bridge( )->instance_exists( ) = abap_true.
 
           CREATE OBJECT lo_object_container.
-          get_tlogo_bridge( )->export_object( lo_object_container ).
+          lo_object_container->set_xml_output( io_xml ).
 
-          get_files( )->add_xml( lo_object_container->mo_xml ).
+          get_tlogo_bridge( )->export_object( lo_object_container ).
 
         ENDIF. "No else needed - if the object does not exist, we'll not serialize anything
       CATCH lcx_obj_exception INTO lx_obj_exception.

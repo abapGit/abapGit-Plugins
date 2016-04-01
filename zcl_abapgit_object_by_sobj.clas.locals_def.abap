@@ -56,11 +56,16 @@ ENDINTERFACE.
 CLASS lcl_abapgit_xml_container DEFINITION.
   PUBLIC SECTION.
     INTERFACES lif_external_object_container.
-    DATA mo_xml TYPE REF TO zcl_abapgit_xml_proxy READ-ONLY.
+    DATA mo_xml_input TYPE REF TO zif_abapgit_xml_input READ-ONLY.
+    DATA mo_xml_output TYPE REF TO zif_abapgit_xml_output READ-ONLY.
 
-    METHODS constructor
-      IMPORTING
-        io_xml TYPE REF TO zcl_abapgit_xml_proxy OPTIONAL.
+    methods set_xml_input
+        importing
+            io_xml type ref to zif_abapgit_xml_input.
+
+    methods set_xml_output
+        importing
+            io_xml type ref to zif_abapgit_xml_output.
 
   PROTECTED SECTION.
     CONSTANTS co_suffix_fieldcat TYPE string VALUE '_field_catalog'.
@@ -71,23 +76,6 @@ CLASS lcl_abapgit_xml_container DEFINITION.
         eo_tabledescr    TYPE REF TO cl_abap_tabledescr
       RAISING
         lcx_obj_exception.
-ENDCLASS.
-
-
-CLASS lcl_abapgit_st_container DEFINITION INHERITING FROM lcl_abapgit_xml_container.
-  PUBLIC SECTION.
-    METHODS lif_external_object_container~store_obj_table REDEFINITION.
-    METHODS lif_external_object_container~get_persisted_table_content REDEFINITION.
-
-  PROTECTED SECTION.
-    CONSTANTS co_element_name_object_tables  TYPE string VALUE 'ObjectDatabaseTables'.
-    CONSTANTS co_element_name_field_catalog  TYPE string VALUE 'FieldCatalog'.
-    CONSTANTS co_element_name_table_content  TYPE string VALUE 'TableContent'.
-
-    METHODS escape_table_name
-      IMPORTING
-                iv_tabname                TYPE tabname
-      RETURNING VALUE(rv_tabname_escaped) TYPE tabname.
 ENDCLASS.
 
 CLASS lcl_tlogo_bridge DEFINITION.

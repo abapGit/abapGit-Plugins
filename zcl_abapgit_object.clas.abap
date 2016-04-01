@@ -5,30 +5,32 @@ CLASS zcl_abapgit_object DEFINITION
 
   PUBLIC SECTION.
 
-    methods set_item
+    TYPES: BEGIN OF ty_metadata,
+             class   TYPE string,
+             version TYPE string,
+           END OF ty_metadata.
+
+    METHODS set_item
       IMPORTING
         !iv_obj_type TYPE tadir-object
         !iv_obj_name TYPE tadir-obj_name.
 
-    METHODS get_files "not FINAL in order to enable unit-testing
-      RETURNING
-        VALUE(ro_files_proxy) TYPE REF TO zcl_abapgit_files_proxy .
-
-    METHODS set_files FINAL
-      IMPORTING
-        io_objects_files TYPE REF TO object.
-
-    METHODS create_xml FINAL
-      IMPORTING
-                iv_xml              TYPE string OPTIONAL
-                iv_empty            TYPE abap_bool DEFAULT abap_false
-      RETURNING VALUE(ro_xml_proxy) TYPE REF TO zcl_abapgit_xml_proxy
-      RAISING   zcx_abapgit_object.
-
     METHODS get_supported_obj_types ABSTRACT
       RETURNING VALUE(rt_obj_type) TYPE objtyptable.
 
+    METHODS wrap_serialize
+      IMPORTING
+        io_xml TYPE REF TO object.
+
+    METHODS wrap_deserialize
+      IMPORTING
+        io_xml     TYPE REF TO object
+        iv_package TYPE devclass.
+
   PROTECTED SECTION.
+    CLASS-DATA   gv_serializer_classname TYPE string.
+    CLASS-DATA   gv_serializer_version   TYPE string.
+
     DATA mv_obj_type TYPE tadir-object.
     DATA mv_obj_name TYPE tadir-obj_name .
 
@@ -42,8 +44,10 @@ CLASS zcl_abapgit_object DEFINITION
       RAISING
         zcx_abapgit_object.
 
+    METHODS get_metadata
+      RETURNING VALUE(rs_metadata) TYPE zif_abapgit_plugin=>ty_metadata.
+
   PRIVATE SECTION.
-    DATA mo_files_proxy TYPE REF TO zcl_abapgit_files_proxy .
 
     METHODS change_object_directory_entry
       IMPORTING
@@ -113,32 +117,16 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD create_xml.
-*    wrap the xml proxy creation. Advantages:
-*    - simplified consumption
-*    - ability to move the proxy class implementation
-    ro_xml_proxy = zcl_abapgit_xml_proxy=>create(
-                     iv_xml   = iv_xml
-                     iv_empty = iv_empty ).
-
-  ENDMETHOD.
-
-
   METHOD delete_tadir_entry.
     me->change_object_directory_entry(  iv_package = ''
                                         iv_delete = abap_true ).
   ENDMETHOD.
 
 
-  METHOD get_files.
-    ro_files_proxy = mo_files_proxy.
-  ENDMETHOD.
-
-
-  METHOD set_files.
-    CREATE OBJECT mo_files_proxy
-      EXPORTING
-        io_objects_files = io_objects_files.
+  METHOD get_metadata.
+    ASSERT gv_serializer_classname IS NOT INITIAL. "needs to be provided in class-constructor of the inheriting class
+    rs_metadata-class = gv_serializer_classname.
+    rs_metadata-version = gv_serializer_version. "optional
   ENDMETHOD.
 
 
@@ -147,5 +135,22 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
     mv_obj_type = iv_obj_type.
     mv_obj_name = iv_obj_name.
 
+  ENDMETHOD.
+
+
+  METHOD wrap_deserialize.
+    CALL METHOD ME->('ZIF_ABAPGIT_PLUGIN~DESERIALIZE')
+      EXPORTING
+        io_xml     = zcl_abapgit_xml_factory=>wrap_xml_input( io_xml )
+        iv_package = iv_package.
+  ENDMETHOD.
+
+
+  METHOD wrap_serialize.
+*    This method wraps the interface method in order to have a typed signature at the plugin-interface
+*    while at the same time keeping the de-coupling of the ABAPGit Report and the plugins
+    CALL METHOD ME->('ZIF_ABAPGIT_PLUGIN~SERIALIZE')
+      EXPORTING
+        io_xml = zcl_abapgit_xml_factory=>wrap_xml_output( io_xml ).
   ENDMETHOD.
 ENDCLASS.
