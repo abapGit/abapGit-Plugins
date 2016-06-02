@@ -59,13 +59,13 @@ CLASS lcl_abapgit_xml_container DEFINITION.
     DATA mo_xml_input TYPE REF TO zif_abapgit_xml_input READ-ONLY.
     DATA mo_xml_output TYPE REF TO zif_abapgit_xml_output READ-ONLY.
 
-    methods set_xml_input
-        importing
-            io_xml type ref to zif_abapgit_xml_input.
+    METHODS set_xml_input
+      IMPORTING
+        io_xml TYPE REF TO zif_abapgit_xml_input.
 
-    methods set_xml_output
-        importing
-            io_xml type ref to zif_abapgit_xml_output.
+    METHODS set_xml_output
+      IMPORTING
+        io_xml TYPE REF TO zif_abapgit_xml_output.
 
   PROTECTED SECTION.
     CONSTANTS co_suffix_fieldcat TYPE string VALUE '_field_catalog'.
@@ -117,7 +117,7 @@ CLASS lcl_tlogo_bridge DEFINITION.
 
     TYPES ty_t_object_table TYPE SORTED TABLE OF ty_s_object_table
                                  WITH UNIQUE KEY objectname objecttype trwcount
-                                 WITH UNIQUE SORTED KEY table_name COMPONENTS tobj_name.
+                                 WITH NON-UNIQUE SORTED KEY table_name COMPONENTS tobj_name.
 
     TYPES ty_t_object_method TYPE SORTED TABLE OF objm WITH UNIQUE KEY objectname objecttype method.
 

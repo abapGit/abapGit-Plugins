@@ -1,10 +1,11 @@
 INTERFACE zif_abapgit_plugin
   PUBLIC .
 
- TYPES: BEGIN OF ty_metadata,
-         class   TYPE string,
-         version TYPE string,
-       END OF ty_metadata.
+  TYPES: BEGIN OF ty_metadata,
+           class      TYPE string,
+           version    TYPE string,
+           late_deser TYPE string,
+         END OF ty_metadata.
 
   METHODS serialize
     IMPORTING
