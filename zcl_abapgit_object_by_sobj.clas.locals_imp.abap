@@ -27,7 +27,8 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
 * object tables
     SELECT * FROM objsl INTO CORRESPONDING FIELDS OF TABLE mt_object_table
       WHERE objectname = mv_object
-      AND   objecttype = co_logical_transport_object.
+      AND objecttype = co_logical_transport_object
+      AND tobject = 'TABU'.
     IF mt_object_table IS INITIAL.
       RAISE EXCEPTION TYPE lcx_obj_exception
         EXPORTING
@@ -69,7 +70,8 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
             iv_text = |Structure of { <ls_object_table>-tobj_name } corrupt|.
       ENDIF.
 
-      lt_included_view = lo_structdescr->get_included_view( 1000 ). "There should not be more inclusion-levels than that - even in ERP
+* There should not be more inclusion-levels than that - even in ERP
+      lt_included_view = lo_structdescr->get_included_view( 1000 ).
       CLEAR <ls_object_table>-field_catalog.
 
       DATA lv_pos LIKE ls_field_cat_comp-pos.
@@ -85,7 +87,8 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
           CATCH cx_sy_move_cast_error.
             RAISE EXCEPTION TYPE lcx_obj_exception
               EXPORTING
-                iv_text = |Structured database table structures as in { <ls_object_table>-tobj_name } are not expected and not yet supported|.
+                iv_text = |Structured database table structures as in {
+                          <ls_object_table>-tobj_name } are not expected and not yet supported|.
         ENDTRY.
 
         READ TABLE lt_dfies ASSIGNING <ls_dfies> WITH KEY fieldname = ls_field_cat_comp-name.
@@ -168,7 +171,8 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
     ls_primary_table = me->get_primary_table( ).
     lv_where_primary_table = me->get_where_clause( iv_tobj_name     = ls_primary_table-tobj_name ).
 
-    READ TABLE lt_imported_table_content ASSIGNING <ls_imported_prim_tab_content> WITH TABLE KEY tabname = ls_primary_table-tobj_name.
+    READ TABLE lt_imported_table_content ASSIGNING <ls_imported_prim_tab_content>
+      WITH TABLE KEY tabname = ls_primary_table-tobj_name.
     IF sy-subrc NE 0.
       RAISE EXCEPTION TYPE lcx_obj_exception
         EXPORTING
@@ -211,14 +215,16 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
       IF lines( <lt_imported_data> ) = 0.
         CONTINUE. "Performance improvement
       ENDIF.
-      READ TABLE mt_object_table ASSIGNING <ls_local_object_table> WITH KEY table_name COMPONENTS tobj_name = <ls_imported_table_content>-tabname.
+      READ TABLE mt_object_table ASSIGNING <ls_local_object_table>
+        WITH KEY table_name COMPONENTS tobj_name = <ls_imported_table_content>-tabname.
       IF sy-subrc <> 0.
         IF mv_tolerate_additional_tables = abap_true.
           CONTINUE.
         ELSE.
           RAISE EXCEPTION TYPE lcx_obj_exception
             EXPORTING
-              iv_text = |Imported container contains table { <ls_imported_table_content>-tabname } which does not exist in local object definition|.
+              iv_text = |Imported container contains table { <ls_imported_table_content>-tabname
+                        } which does not exist in local object definition|.
         ENDIF.
       ENDIF.
 
@@ -316,7 +322,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
     IF sy-subrc = 0.
       CALL FUNCTION <ls_object_method>-methodname
         EXPORTING
-          IV_TARCLIENT  = sy-mandt "this is actually optional for most AIM, but let's supply it and hope that those client-independent-ones just ignore it
+          iv_tarclient  = sy-mandt "this is actually optional for most AIM, but let's supply it and hope that those client-independent-ones just ignore it
           iv_is_upgrade = abap_false
         TABLES
           tt_e071       = lt_cts_object_entry
@@ -824,7 +830,7 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
     DATA lx_sy_struct_creation TYPE REF TO cx_sy_struct_creation.
     TRY.
         lo_structdescr = cl_abap_structdescr=>create( lt_component ).
-      CATCH cx_sy_struct_creation INTO lx_sy_struct_creation.  "
+      CATCH cx_sy_struct_creation INTO lx_sy_struct_creation.
         RAISE EXCEPTION TYPE lcx_obj_exception
           EXPORTING
             iv_text  = lx_sy_struct_creation->get_text( )
@@ -834,9 +840,8 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
     DATA lx_sy_table_creation TYPE REF TO cx_sy_table_creation.
     TRY.
         eo_tabledescr = cl_abap_tabledescr=>create(
-            p_line_type          = lo_structdescr
-            p_table_kind         = cl_abap_tabledescr=>tablekind_std
-        ).
+            p_line_type  = lo_structdescr
+            p_table_kind = cl_abap_tabledescr=>tablekind_std ).
       CATCH cx_sy_table_creation INTO lx_sy_table_creation.
         RAISE EXCEPTION TYPE lcx_obj_exception
           EXPORTING
