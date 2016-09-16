@@ -736,6 +736,11 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
       ENDTRY.
 
 
+      IF lines( <ls_table_content>-field_catalog ) = 0.
+* ignore tables that are new in upgraded systems
+        CONTINUE.
+      ENDIF.
+
       DATA lo_tabledescr TYPE REF TO cl_abap_tabledescr.
 
 
@@ -815,9 +820,8 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
               ls_component-type = cl_abap_elemdescr=>get_n( <ls_field_catalog>-length ).
             WHEN  cl_abap_typedescr=>typekind_packed.
               ls_component-type = cl_abap_elemdescr=>get_p(
-                  p_length                   = <ls_field_catalog>-length
-                  p_decimals                 = <ls_field_catalog>-decimals
-              ).
+                p_length   = <ls_field_catalog>-length
+                p_decimals = <ls_field_catalog>-decimals ).
             WHEN cl_abap_typedescr=>typekind_time.
               ls_component-type = cl_abap_elemdescr=>get_t( ).
             WHEN cl_abap_typedescr=>typekind_string.
