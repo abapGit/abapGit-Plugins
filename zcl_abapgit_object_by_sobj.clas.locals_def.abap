@@ -135,6 +135,11 @@ CLASS lcl_tlogo_bridge DEFINITION.
                 VALUE(rs_object_table) TYPE ty_s_object_table
       RAISING   lcx_obj_exception.
 
+    METHODS build_catalog
+      IMPORTING iv_tobj_name      TYPE objsl-tobj_name
+      RETURNING VALUE(rt_catalog) TYPE lif_external_object_container=>ty_t_component
+      RAISING   lcx_obj_exception.
+
     METHODS
       get_where_clause
         IMPORTING

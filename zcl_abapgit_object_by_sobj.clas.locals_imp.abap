@@ -1,6 +1,10 @@
 CLASS lcl_tlogo_bridge IMPLEMENTATION.
 
   METHOD constructor.
+
+    FIELD-SYMBOLS <ls_object_table> LIKE LINE OF mt_object_table.
+
+
     mv_object = iv_object.
     mv_object_name = iv_object_name.
 
@@ -35,80 +39,83 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
           iv_text = |Obviously corrupted object-type { mv_object }: No tables defined|.
     ENDIF.
 
-*  field catalog of table structures in current system
-    FIELD-SYMBOLS <ls_object_table> LIKE LINE OF mt_object_table.
-    DATA lo_structdescr     TYPE REF TO cl_abap_structdescr.
-    DATA lt_included_view   TYPE cl_abap_structdescr=>included_view.
-    DATA ls_component       LIKE LINE OF lt_included_view.
-    DATA ls_field_cat_comp  LIKE LINE OF <ls_object_table>-field_catalog.
-    DATA lo_elemdescr       TYPE REF TO cl_abap_elemdescr.
-    DATA lt_dfies           TYPE dfies_table. "Needed for the keyflag
-    FIELD-SYMBOLS <ls_dfies> LIKE LINE OF lt_dfies.
-
-
     LOOP AT mt_object_table ASSIGNING <ls_object_table>.
-      lo_structdescr ?= cl_abap_structdescr=>describe_by_name( <ls_object_table>-tobj_name ).
-      IF sy-subrc NE 0.
-        RAISE EXCEPTION TYPE lcx_obj_exception
-          EXPORTING
-            iv_text = |Structure of { <ls_object_table>-tobj_name } corrupt|.
-      ENDIF.
-
-      DATA lv_tabname_ddobj TYPE ddobjname.
-      lv_tabname_ddobj = <ls_object_table>-tobj_name.
-      CALL FUNCTION 'DDIF_NAMETAB_GET'
-        EXPORTING
-          tabname   = lv_tabname_ddobj    " Name of Table (of the Type)
-        TABLES
-          dfies_tab = lt_dfies
-        EXCEPTIONS
-          not_found = 1
-          OTHERS    = 2.
-      IF sy-subrc NE 0.
-        RAISE EXCEPTION TYPE lcx_obj_exception
-          EXPORTING
-            iv_text = |Structure of { <ls_object_table>-tobj_name } corrupt|.
-      ENDIF.
-
-* There should not be more inclusion-levels than that - even in ERP
-      lt_included_view = lo_structdescr->get_included_view( 1000 ).
-      CLEAR <ls_object_table>-field_catalog.
-
-      DATA lv_pos LIKE ls_field_cat_comp-pos.
-      CLEAR lv_pos.
-      LOOP AT lt_included_view INTO ls_component.
-        CLEAR ls_field_cat_comp.
-
-        ADD 1 TO lv_pos.
-        ls_field_cat_comp-pos = lv_pos.
-        ls_field_cat_comp-name = ls_component-name.
-        TRY.
-            lo_elemdescr ?= ls_component-type.
-          CATCH cx_sy_move_cast_error.
-            RAISE EXCEPTION TYPE lcx_obj_exception
-              EXPORTING
-                iv_text = |Structured database table structures as in {
-                          <ls_object_table>-tobj_name } are not expected and not yet supported|.
-        ENDTRY.
-
-        READ TABLE lt_dfies ASSIGNING <ls_dfies> WITH KEY fieldname = ls_field_cat_comp-name.
-        ASSERT sy-subrc = 0. "Can't imagine why an element may have a different name than the field.
-
-        ls_field_cat_comp-type_kind  = lo_elemdescr->type_kind.
-        ls_field_cat_comp-length     = <ls_dfies>-leng. "lo_elemdescr->length funnily return the byte-length
-        ls_field_cat_comp-decimals   = lo_elemdescr->decimals.
-
-        ls_field_cat_comp-is_key = <ls_dfies>-keyflag.
-
-        INSERT ls_field_cat_comp INTO TABLE <ls_object_table>-field_catalog.
-      ENDLOOP.
-
+      <ls_object_table>-field_catalog = build_catalog( <ls_object_table>-tobj_name ).
     ENDLOOP.
 
 * object methods
     SELECT * FROM objm INTO TABLE mt_object_method
       WHERE objectname = mv_object
       AND   objecttype = co_logical_transport_object.
+
+  ENDMETHOD.
+
+  METHOD build_catalog.
+
+*  field catalog of table structures in current system
+    DATA lo_structdescr     TYPE REF TO cl_abap_structdescr.
+    DATA lt_included_view   TYPE cl_abap_structdescr=>included_view.
+    DATA ls_component       LIKE LINE OF lt_included_view.
+    DATA ls_field_cat_comp  LIKE LINE OF rt_catalog.
+    DATA lo_elemdescr       TYPE REF TO cl_abap_elemdescr.
+    DATA lt_dfies           TYPE dfies_table. "Needed for the keyflag
+    FIELD-SYMBOLS <ls_dfies> LIKE LINE OF lt_dfies.
+
+
+    lo_structdescr ?= cl_abap_structdescr=>describe_by_name( iv_tobj_name ).
+    IF sy-subrc NE 0.
+      RAISE EXCEPTION TYPE lcx_obj_exception
+        EXPORTING
+          iv_text = |Structure of { iv_tobj_name } corrupt|.
+    ENDIF.
+
+    DATA lv_tabname_ddobj TYPE ddobjname.
+    lv_tabname_ddobj = iv_tobj_name.
+    CALL FUNCTION 'DDIF_NAMETAB_GET'
+      EXPORTING
+        tabname   = lv_tabname_ddobj    " Name of Table (of the Type)
+      TABLES
+        dfies_tab = lt_dfies
+      EXCEPTIONS
+        not_found = 1
+        OTHERS    = 2.
+    IF sy-subrc NE 0.
+      RAISE EXCEPTION TYPE lcx_obj_exception
+        EXPORTING
+          iv_text = |Structure of { iv_tobj_name } corrupt|.
+    ENDIF.
+
+* There should not be more inclusion-levels than that - even in ERP
+    lt_included_view = lo_structdescr->get_included_view( 1000 ).
+
+    DATA lv_pos LIKE ls_field_cat_comp-pos.
+    CLEAR lv_pos.
+    LOOP AT lt_included_view INTO ls_component.
+      CLEAR ls_field_cat_comp.
+
+      ADD 1 TO lv_pos.
+      ls_field_cat_comp-pos = lv_pos.
+      ls_field_cat_comp-name = ls_component-name.
+      TRY.
+          lo_elemdescr ?= ls_component-type.
+        CATCH cx_sy_move_cast_error.
+          RAISE EXCEPTION TYPE lcx_obj_exception
+            EXPORTING
+              iv_text = |Structured database table structures as in {
+                        iv_tobj_name } are not expected and not yet supported|.
+      ENDTRY.
+
+      READ TABLE lt_dfies ASSIGNING <ls_dfies> WITH KEY fieldname = ls_field_cat_comp-name.
+      ASSERT sy-subrc = 0. "Can't imagine why an element may have a different name than the field.
+
+      ls_field_cat_comp-type_kind  = lo_elemdescr->type_kind.
+      ls_field_cat_comp-length     = <ls_dfies>-leng. "lo_elemdescr->length funnily return the byte-length
+      ls_field_cat_comp-decimals   = lo_elemdescr->decimals.
+
+      ls_field_cat_comp-is_key = <ls_dfies>-keyflag.
+
+      INSERT ls_field_cat_comp INTO TABLE rt_catalog.
+    ENDLOOP.
 
   ENDMETHOD.
 
