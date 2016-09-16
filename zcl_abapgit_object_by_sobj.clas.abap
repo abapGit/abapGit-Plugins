@@ -15,7 +15,8 @@ CLASS zcl_abapgit_object_by_sobj DEFINITION
   PRIVATE SECTION.
 
     METHODS get_tlogo_bridge
-      RETURNING VALUE(ro_tlogo_bridge) TYPE REF TO lcl_tlogo_bridge.
+      RETURNING VALUE(ro_tlogo_bridge) TYPE REF TO lcl_tlogo_bridge
+      RAISING   zcx_abapgit_object.
 
     DATA mo_tlogo_bridge TYPE REF TO lcl_tlogo_bridge.
 

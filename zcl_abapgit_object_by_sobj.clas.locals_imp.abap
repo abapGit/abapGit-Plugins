@@ -1,56 +1,6 @@
-CLASS lcl_tlogo_bridge IMPLEMENTATION.
+CLASS lcl_catalog IMPLEMENTATION.
 
-  METHOD constructor.
-
-    FIELD-SYMBOLS <ls_object_table> LIKE LINE OF mt_object_table.
-
-
-    mv_object = iv_object.
-    mv_object_name = iv_object_name.
-
-*    Default configuration for validation of metadata
-    mv_tolerate_additional_tables   = abap_false.
-    mv_tolerate_deviating_fields    = abap_true.
-    mv_tolerate_deviating_types     = abap_false.
-
-    CONSTANTS co_logical_transport_object TYPE c LENGTH 1 VALUE 'L'.
-
-* get the TLOGO properties as stored in transaction SOBJ
-
-* object header
-    SELECT SINGLE * FROM objh INTO ms_object_header
-      WHERE objectname = mv_object
-      AND   objecttype = co_logical_transport_object.
-
-    IF ms_object_header IS INITIAL.
-      RAISE EXCEPTION TYPE lcx_obj_exception
-        EXPORTING
-          iv_text = |Unsupported object-type { mv_object }|.
-    ENDIF.
-
-* object tables
-    SELECT * FROM objsl INTO CORRESPONDING FIELDS OF TABLE mt_object_table
-      WHERE objectname = mv_object
-      AND objecttype = co_logical_transport_object
-      AND tobject = 'TABU'.
-    IF mt_object_table IS INITIAL.
-      RAISE EXCEPTION TYPE lcx_obj_exception
-        EXPORTING
-          iv_text = |Obviously corrupted object-type { mv_object }: No tables defined|.
-    ENDIF.
-
-    LOOP AT mt_object_table ASSIGNING <ls_object_table>.
-      <ls_object_table>-field_catalog = build_catalog( <ls_object_table>-tobj_name ).
-    ENDLOOP.
-
-* object methods
-    SELECT * FROM objm INTO TABLE mt_object_method
-      WHERE objectname = mv_object
-      AND   objecttype = co_logical_transport_object.
-
-  ENDMETHOD.
-
-  METHOD build_catalog.
+  METHOD build.
 
 *  field catalog of table structures in current system
     DATA lo_structdescr     TYPE REF TO cl_abap_structdescr.
@@ -116,6 +66,60 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
 
       INSERT ls_field_cat_comp INTO TABLE rt_catalog.
     ENDLOOP.
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+CLASS lcl_tlogo_bridge IMPLEMENTATION.
+
+  METHOD constructor.
+
+    FIELD-SYMBOLS <ls_object_table> LIKE LINE OF mt_object_table.
+
+
+    mv_object = iv_object.
+    mv_object_name = iv_object_name.
+
+*    Default configuration for validation of metadata
+    mv_tolerate_additional_tables   = abap_false.
+    mv_tolerate_deviating_fields    = abap_true.
+    mv_tolerate_deviating_types     = abap_false.
+
+    CONSTANTS co_logical_transport_object TYPE c LENGTH 1 VALUE 'L'.
+
+* get the TLOGO properties as stored in transaction SOBJ
+
+* object header
+    SELECT SINGLE * FROM objh INTO ms_object_header
+      WHERE objectname = mv_object
+      AND   objecttype = co_logical_transport_object.
+
+    IF ms_object_header IS INITIAL.
+      RAISE EXCEPTION TYPE lcx_obj_exception
+        EXPORTING
+          iv_text = |Unsupported object-type { mv_object }|.
+    ENDIF.
+
+* object tables
+    SELECT * FROM objsl INTO CORRESPONDING FIELDS OF TABLE mt_object_table
+      WHERE objectname = mv_object
+      AND objecttype = co_logical_transport_object
+      AND tobject = 'TABU'.
+    IF mt_object_table IS INITIAL.
+      RAISE EXCEPTION TYPE lcx_obj_exception
+        EXPORTING
+          iv_text = |Obviously corrupted object-type { mv_object }: No tables defined|.
+    ENDIF.
+
+    LOOP AT mt_object_table ASSIGNING <ls_object_table>.
+      <ls_object_table>-field_catalog = lcl_catalog=>build( <ls_object_table>-tobj_name ).
+    ENDLOOP.
+
+* object methods
+    SELECT * FROM objm INTO TABLE mt_object_method
+      WHERE objectname = mv_object
+      AND   objecttype = co_logical_transport_object.
 
   ENDMETHOD.
 

@@ -21,8 +21,50 @@ CLASS lcl_test_bridge IMPLEMENTATION.
   METHOD constructor.
     super->constructor(
         iv_object         = iv_object
-        iv_object_name    = iv_object_name
-    ).
+        iv_object_name    = iv_object_name ).
+
+  ENDMETHOD.
+
+ENDCLASS.
+
+CLASS ltcl_catalog DEFINITION FINAL FOR TESTING
+  DURATION SHORT
+  RISK LEVEL HARMLESS.
+
+  PRIVATE SECTION.
+    METHODS build FOR TESTING RAISING cx_static_check.
+
+ENDCLASS.
+
+CLASS ltcl_catalog IMPLEMENTATION.
+
+  METHOD build.
+
+    CONSTANTS lc_tab TYPE objsl-tobj_name VALUE '/IWBEP/I_SBD_GA'.
+
+    DATA: lt_catalog TYPE lif_external_object_container=>ty_t_component.
+
+    FIELD-SYMBOLS: <ls_catalog> LIKE LINE OF lt_catalog.
+
+
+* make sure the database table exists in system
+    CALL METHOD cl_abap_structdescr=>describe_by_name
+      EXPORTING
+        p_name         = lc_tab
+      EXCEPTIONS
+        type_not_found = 1.
+    IF sy-subrc <> 0.
+      RETURN.
+    ENDIF.
+
+    lt_catalog = lcl_catalog=>build( lc_tab ).
+
+    LOOP AT lt_catalog ASSIGNING <ls_catalog> WHERE type_kind = cl_abap_typedescr=>typekind_packed.
+      cl_abap_unit_assert=>assert_number_between(
+        lower  = 1
+        upper  = cl_abap_elemdescr=>type_p_max_length
+        number = <ls_catalog>-length ).
+    ENDLOOP.
 
   ENDMETHOD.
 
@@ -44,15 +86,17 @@ ENDCLASS.
 CLASS ltcl_acgr IMPLEMENTATION.
 
   METHOD where_clause_client.
-    cl_abap_unit_assert=>assert_equals( msg = 'Where clause not expected'
-                                        exp = |MANDT = '{ sy-mandt }' AND AGR_NAME = 'ZOBJUT_TEST_DUMMY'|
-                                        act = mo_bridge->expose_where_clause( 'AGR_DEFINE' ) ).
+    cl_abap_unit_assert=>assert_equals(
+      msg = 'Where clause not expected'
+      exp = |MANDT = '{ sy-mandt }' AND AGR_NAME = 'ZOBJUT_TEST_DUMMY'|
+      act = mo_bridge->expose_where_clause( 'AGR_DEFINE' ) ).
   ENDMETHOD.
 
   METHOD where_clause_language.
-    cl_abap_unit_assert=>assert_equals( msg = 'Where clause not expected'
-                                        exp = |MANDT = '{ sy-mandt }' AND AGR_NAME = 'ZOBJUT_TEST_DUMMY' AND SPRAS = '{ sy-langu }'|
-                                        act = mo_bridge->expose_where_clause( 'AGR_HIERT' ) ).
+    cl_abap_unit_assert=>assert_equals(
+      msg = 'Where clause not expected'
+      exp = |MANDT = '{ sy-mandt }' AND AGR_NAME = 'ZOBJUT_TEST_DUMMY' AND SPRAS = '{ sy-langu }'|
+      act = mo_bridge->expose_where_clause( 'AGR_HIERT' ) ).
   ENDMETHOD.
 
   METHOD setup.
@@ -124,13 +168,15 @@ CLASS ltcl_bmsm IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD where_clause_values_everywhere.
-    cl_abap_unit_assert=>assert_equals( msg = 'Where clause not expected'
-                                        exp = |PARENT_TYP = 'T' AND PARENT_OBJ = 'ZOBJUT_TEST_DUMMY' AND AS4LOCAL = 'A' AND MODEL_TYP = 'PM'|
-                                        act = mo_bridge->expose_where_clause( 'DF40D' ) ).
+    cl_abap_unit_assert=>assert_equals(
+      msg = 'Where clause not expected'
+      exp = |PARENT_TYP = 'T' AND PARENT_OBJ = 'ZOBJUT_TEST_DUMMY' AND AS4LOCAL = 'A' AND MODEL_TYP = 'PM'|
+      act = mo_bridge->expose_where_clause( 'DF40D' ) ).
 
   ENDMETHOD.
 
 ENDCLASS.
+
 
 CLASS ltcl_bobf DEFINITION FINAL FOR TESTING
   INHERITING FROM zcl_abapgit_object_by_sobj
@@ -169,10 +215,8 @@ CLASS ltcl_bobf IMPLEMENTATION.
   METHOD constructor.
     super->constructor( ).
 
-    me->set_item(
-        iv_obj_type = 'BOBF'
-        iv_obj_name = 'ZABAPGIT_UNITTEST'
-    ).
+    me->set_item( iv_obj_type = 'BOBF'
+                  iv_obj_name = 'ZABAPGIT_UNITTEST' ).
   ENDMETHOD.
 
   METHOD class_setup.
@@ -408,14 +452,15 @@ CLASS ltcl_bobf IMPLEMENTATION.
     go_bridge->import_object( me->get_bobf_container( ) ).
 
     SELECT COUNT(*) FROM /bobf/act_conf WHERE name = 'ZABAPGIT_UNITTEST'.
-    cl_abap_unit_assert=>assert_equals( msg = 'Database content of /BOBF/ACT_CONF found deviated' exp = 7 act = sy-dbcnt ).
+    cl_abap_unit_assert=>assert_equals(
+      msg = 'Database content of /BOBF/ACT_CONF found deviated'
+      exp = 7
+      act = sy-dbcnt ).
 
 *    check whether the BOPF designtime accepted the imported object
     DATA lo_conf TYPE REF TO /bobf/if_frw_configuration.
 
-    gv_ut_bo_key = /bobf/cl_frw_factory=>query_bo(
-              iv_bo_name       = 'ZABAPGIT_UNITTEST'
-          ).
+    gv_ut_bo_key = /bobf/cl_frw_factory=>query_bo( iv_bo_name = 'ZABAPGIT_UNITTEST' ).
     cl_abap_unit_assert=>assert_not_initial( gv_ut_bo_key ).
 
     lo_conf = /bobf/cl_frw_factory=>get_configuration( gv_ut_bo_key ).
@@ -426,9 +471,10 @@ CLASS ltcl_bobf IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD t002_check_existence.
-    cl_abap_unit_assert=>assert_equals(   msg = 'Imported object type BOBF, ZABAPGIT_UNITTEST does not exist'
-                                          exp = abap_true
-                                          act = go_bridge->instance_exists( ) ).
+    cl_abap_unit_assert=>assert_equals(
+      msg = 'Imported object type BOBF, ZABAPGIT_UNITTEST does not exist'
+      exp = abap_true
+      act = go_bridge->instance_exists( ) ).
   ENDMETHOD.
 
   METHOD t150_export_object.
@@ -446,7 +492,7 @@ CLASS ltcl_bobf IMPLEMENTATION.
     lo_ixml = cl_ixml=>create( ).
     lo_document = lo_ixml->create_document( ).
     lo_document->append_child( lo_xml_container->mo_xml_input->get_raw( ) ). "Current design does not allow accessing the DOM of a created xml
-                                                                             "(lcl_xml_output) and in- and out are two different instances...
+    "(lcl_xml_output) and in- and out are two different instances...
 
     lo_renderer = lo_ixml->create_renderer(
                   document = lo_document

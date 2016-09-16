@@ -78,6 +78,18 @@ CLASS lcl_abapgit_xml_container DEFINITION.
         lcx_obj_exception.
 ENDCLASS.
 
+CLASS ltcl_catalog DEFINITION DEFERRED.
+
+CLASS lcl_catalog DEFINITION FRIENDS ltcl_catalog.
+
+  PUBLIC SECTION.
+    CLASS-METHODS build
+      IMPORTING iv_tobj_name      TYPE objsl-tobj_name
+      RETURNING VALUE(rt_catalog) TYPE lif_external_object_container=>ty_t_component
+      RAISING   lcx_obj_exception.
+
+ENDCLASS.
+
 CLASS lcl_tlogo_bridge DEFINITION.
 * This class is inspired by CL_RSO_TLOGO_XML_BRIDGE which provides
 * features to serialize a logical transport object based on its definition
@@ -88,8 +100,7 @@ CLASS lcl_tlogo_bridge DEFINITION.
 
   PUBLIC SECTION.
     METHODS constructor
-      IMPORTING
-                iv_object      TYPE tadir-object "This is the name of the SOBJ-object (M1) which is the type of all objects derived from it
+      IMPORTING iv_object      TYPE tadir-object "This is the name of the SOBJ-object (M1) which is the type of all objects derived from it
                 iv_object_name TYPE sobj_name
       RAISING   lcx_obj_exception.
 
@@ -135,11 +146,6 @@ CLASS lcl_tlogo_bridge DEFINITION.
                 VALUE(rs_object_table) TYPE ty_s_object_table
       RAISING   lcx_obj_exception.
 
-    METHODS build_catalog
-      IMPORTING iv_tobj_name      TYPE objsl-tobj_name
-      RETURNING VALUE(rt_catalog) TYPE lif_external_object_container=>ty_t_component
-      RAISING   lcx_obj_exception.
-
     METHODS
       get_where_clause
         IMPORTING
@@ -179,8 +185,6 @@ CLASS lcl_tlogo_bridge DEFINITION.
       IMPORTING
         iv_table_name    TYPE lcl_tlogo_bridge=>ty_s_object_table-tobj_name
         iv_where_on_keys TYPE string.
-
-
 
     METHODS split_value_to_keys
       IMPORTING
