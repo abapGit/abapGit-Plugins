@@ -1,32 +1,33 @@
 CLASS zcl_abapgit_object DEFINITION
   PUBLIC
   ABSTRACT
-  CREATE PUBLIC .
+  CREATE PUBLIC.
 
   PUBLIC SECTION.
 
-    TYPES: BEGIN OF ty_metadata,
-             class   TYPE string,
-             version TYPE string,
-           END OF ty_metadata.
+    TYPES:
+      BEGIN OF ty_metadata,
+        class   TYPE string,
+        version TYPE string,
+      END OF ty_metadata .
 
     METHODS set_item
       IMPORTING
         !iv_obj_type TYPE tadir-object
-        !iv_obj_name TYPE tadir-obj_name.
-
-    METHODS get_supported_obj_types ABSTRACT
-      RETURNING VALUE(rt_obj_type) TYPE objtyptable.
-
+        !iv_obj_name TYPE tadir-obj_name .
+    METHODS get_supported_obj_types
+          ABSTRACT
+      RETURNING
+        VALUE(rt_obj_type) TYPE objtyptable .
     METHODS wrap_serialize
       IMPORTING
-        io_xml TYPE REF TO object.
-
+        !io_xml TYPE REF TO object .
     METHODS wrap_deserialize
       IMPORTING
-        io_xml     TYPE REF TO object
-        iv_package TYPE devclass.
-
+        !io_xml     TYPE REF TO object
+        !iv_package TYPE devclass
+      RAISING
+        zcx_abapgit_object .
   PROTECTED SECTION.
     CLASS-DATA   gv_serializer_classname TYPE string.
     CLASS-DATA   gv_serializer_version   TYPE string.
@@ -139,7 +140,7 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
 
 
   METHOD wrap_deserialize.
-    CALL METHOD ME->('ZIF_ABAPGIT_PLUGIN~DESERIALIZE')
+    CALL METHOD me->('ZIF_ABAPGIT_PLUGIN~DESERIALIZE')
       EXPORTING
         io_xml     = zcl_abapgit_xml_factory=>wrap_xml_input( io_xml )
         iv_package = iv_package.
@@ -149,7 +150,7 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
   METHOD wrap_serialize.
 *    This method wraps the interface method in order to have a typed signature at the plugin-interface
 *    while at the same time keeping the de-coupling of the ABAPGit Report and the plugins
-    CALL METHOD ME->('ZIF_ABAPGIT_PLUGIN~SERIALIZE')
+    CALL METHOD me->('ZIF_ABAPGIT_PLUGIN~SERIALIZE')
       EXPORTING
         io_xml = zcl_abapgit_xml_factory=>wrap_xml_output( io_xml ).
   ENDMETHOD.
