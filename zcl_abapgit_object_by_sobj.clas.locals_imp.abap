@@ -59,8 +59,12 @@ CLASS lcl_catalog IMPLEMENTATION.
       ASSERT sy-subrc = 0. "Can't imagine why an element may have a different name than the field.
 
       ls_field_cat_comp-type_kind  = lo_elemdescr->type_kind.
-      ls_field_cat_comp-length     = <ls_dfies>-leng. "lo_elemdescr->length funnily return the byte-length
-      ls_field_cat_comp-decimals   = lo_elemdescr->decimals.
+      IF ls_field_cat_comp-type_kind = cl_abap_typedescr=>typekind_packed.
+        ls_field_cat_comp-length = lo_elemdescr->length.
+      ELSE.
+        ls_field_cat_comp-length = <ls_dfies>-leng. "lo_elemdescr->length funnily return the byte-length
+      ENDIF.
+      ls_field_cat_comp-decimals = lo_elemdescr->decimals.
 
       ls_field_cat_comp-is_key = <ls_dfies>-keyflag.
 

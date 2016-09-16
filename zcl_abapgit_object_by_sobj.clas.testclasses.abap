@@ -5,8 +5,7 @@ CLASS lcl_test_bridge DEFINITION INHERITING FROM lcl_tlogo_bridge.
       RETURNING VALUE(rv_where_on_keys) TYPE string.
 
     METHODS constructor
-      IMPORTING
-                iv_object      TYPE trobjtype
+      IMPORTING iv_object      TYPE trobjtype
                 iv_object_name LIKE mv_object_name
       RAISING   lcx_obj_exception.
 
@@ -22,7 +21,6 @@ CLASS lcl_test_bridge IMPLEMENTATION.
     super->constructor(
         iv_object         = iv_object
         iv_object_name    = iv_object_name ).
-
   ENDMETHOD.
 
 ENDCLASS.
