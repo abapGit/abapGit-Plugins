@@ -71,6 +71,7 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
 
     CALL FUNCTION 'TR_TADIR_INTERFACE'
       EXPORTING
+        wi_test_modus                  = abap_false
         wi_delete_tadir_entry          = iv_delete    " X - delete object directory entry
         wi_tadir_pgmid                 = 'R3TR'    " Input for TADIR field PGMID
         wi_tadir_object                = lv_tadir_object    " Input for TADIR field OBJECT
