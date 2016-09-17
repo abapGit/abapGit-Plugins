@@ -41,10 +41,6 @@ CLASS zcl_abapgit_object DEFINITION
       RAISING
         zcx_abapgit_object.
 
-    METHODS delete_tadir_entry
-      RAISING
-        zcx_abapgit_object.
-
     METHODS get_metadata
       RETURNING VALUE(rs_metadata) TYPE zif_abapgit_plugin=>ty_metadata.
 
@@ -116,12 +112,6 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
   METHOD create_tadir_entry.
     me->change_object_directory_entry(  iv_package = iv_package
                                         iv_delete = abap_false ).
-  ENDMETHOD.
-
-
-  METHOD delete_tadir_entry.
-    me->change_object_directory_entry(  iv_package = ''
-                                        iv_delete = abap_true ).
   ENDMETHOD.
 
 

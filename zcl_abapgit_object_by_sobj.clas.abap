@@ -79,8 +79,6 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
 
     get_tlogo_bridge( )->delete_object_on_db( ).
 
-    me->delete_tadir_entry( ).
-
   ENDMETHOD.
 
 
@@ -119,6 +117,7 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
 
   METHOD zif_abapgit_plugin~get_metadata.
     rs_metadata = get_metadata( ).
+    rs_metadata-delete_tadir = abap_true.
   ENDMETHOD.
 
 
