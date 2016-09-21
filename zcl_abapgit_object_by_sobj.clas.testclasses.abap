@@ -2,7 +2,7 @@ CLASS lcl_test_bridge DEFINITION INHERITING FROM lcl_tlogo_bridge.
   PUBLIC SECTION.
     METHODS expose_where_clause
       IMPORTING iv_table_name           TYPE sobj_name
-      RETURNING VALUE(rv_where_on_keys) TYPE string.
+      RETURNING value(rv_where_on_keys) TYPE string.
 
     METHODS constructor
       IMPORTING iv_object      TYPE trobjtype
@@ -38,7 +38,8 @@ CLASS ltcl_catalog IMPLEMENTATION.
 
   METHOD build.
 
-    CONSTANTS lc_tab TYPE objsl-tobj_name VALUE '/IWBEP/I_SBD_GA'.
+    CONSTANTS: lc_tab               TYPE objsl-tobj_name VALUE '/IWBEP/I_SBD_GA',
+               lc_type_p_max_length TYPE i VALUE 16.
 
     DATA: lt_catalog TYPE lif_external_object_container=>ty_t_component.
 
@@ -60,7 +61,7 @@ CLASS ltcl_catalog IMPLEMENTATION.
     LOOP AT lt_catalog ASSIGNING <ls_catalog> WHERE type_kind = cl_abap_typedescr=>typekind_packed.
       cl_abap_unit_assert=>assert_number_between(
         lower  = 1
-        upper  = cl_abap_elemdescr=>type_p_max_length
+        upper  = lc_type_p_max_length
         number = <ls_catalog>-length ).
     ENDLOOP.
 
@@ -201,11 +202,11 @@ CLASS ltcl_bobf DEFINITION FINAL FOR TESTING
       t200_delete_object        FOR TESTING RAISING cx_static_check.
 
     METHODS get_bobf_container
-      RETURNING VALUE(ro_container) TYPE REF TO lcl_abapgit_xml_container
+      RETURNING value(ro_container) TYPE REF TO lcl_abapgit_xml_container
       RAISING   cx_static_check.
 
     METHODS get_bopf_persisted_string
-      RETURNING VALUE(rv_xml) TYPE string.
+      RETURNING value(rv_xml) TYPE string.
 ENDCLASS.
 
 
