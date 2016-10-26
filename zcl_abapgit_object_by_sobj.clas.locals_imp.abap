@@ -572,7 +572,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
         ELSE.
           RAISE EXCEPTION TYPE lcx_obj_exception
             EXPORTING
-              iv_text = |Field { ls_local_field_def-name } does not exist in imported data's structure|.
+              iv_text = |Field { ls_local_field_def-name } does not exist in imported data structure|.
         ENDIF.
       ENDIF.
 
@@ -583,7 +583,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
         ELSE.
           RAISE EXCEPTION TYPE lcx_obj_exception
             EXPORTING
-              iv_text = |Field { ls_local_field_def-name } has got a different type in local and imported data's structure|.
+              iv_text = |Field { ls_local_field_def-name } has got a different type in local and imported data structure|.
         ENDIF.
       ENDIF.
 
@@ -596,7 +596,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
       IF mv_tolerate_deviating_fields = abap_false.
         RAISE EXCEPTION TYPE lcx_obj_exception
           EXPORTING
-            iv_text = |There are fields in the imported table which do not exist in local data's structure|.
+            iv_text = |There are fields in the imported table which do not exist in local data structure|.
       ENDIF.
     ENDIF.
 
@@ -670,11 +670,18 @@ ENDCLASS.
 
 
 CLASS lcx_obj_exception IMPLEMENTATION.
+
   METHOD constructor.
     super->constructor( textid   = textid
                         previous = previous ).
     mv_text = iv_text.
   ENDMETHOD.
+
+  METHOD get_error_text.
+* todo, perhaps remove mv_text attribute?
+    rv_text = mv_text.
+  ENDMETHOD.
+
 ENDCLASS.
 
 
@@ -688,11 +695,11 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
 
     ASSIGN is_table_content-data_tab->* TO <lt_data>.
     TRY.
-        mo_xml_output->add( iv_name            = |{ is_table_content-tabname }|
-                            ig_data            = <lt_data> ).
+        mo_xml_output->add( iv_name = |{ is_table_content-tabname }|
+                            ig_data = <lt_data> ).
 
-        mo_xml_output->add( iv_name            = |{ is_table_content-tabname }{ co_suffix_fieldcat }|
-                            ig_data            = is_table_content-field_catalog ).
+        mo_xml_output->add( iv_name = |{ is_table_content-tabname }{ co_suffix_fieldcat }|
+                            ig_data = is_table_content-field_catalog ).
 
       CATCH zcx_abapgit_object INTO lx_abapgit_object.
         RAISE EXCEPTION TYPE lcx_obj_exception

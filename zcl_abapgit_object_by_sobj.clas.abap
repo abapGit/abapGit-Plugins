@@ -95,7 +95,8 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
       CATCH lcx_obj_exception INTO lx_obj_exception.
         RAISE EXCEPTION TYPE zcx_abapgit_object
           EXPORTING
-            iv_text  = |Import of { mv_obj_type } { mv_obj_name } failed|
+            iv_text  = |{ mv_obj_type } { mv_obj_name }: {
+                        lx_obj_exception->get_error_text( ) }|
             previous = lx_obj_exception.
     ENDTRY.
 
