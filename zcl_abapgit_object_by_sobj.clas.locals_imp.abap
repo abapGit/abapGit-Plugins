@@ -576,7 +576,9 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
         ENDIF.
       ENDIF.
 
-      IF ls_imported_field_def NE ls_local_field_def.
+      IF ls_imported_field_def-type_kind <> ls_local_field_def-type_kind
+          OR ls_imported_field_def-length > ls_local_field_def-length
+          OR ls_imported_field_def-decimals > ls_local_field_def-decimals.
         ev_is_identical = abap_false.
         IF mv_tolerate_deviating_types = abap_true.
           CONTINUE. ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
