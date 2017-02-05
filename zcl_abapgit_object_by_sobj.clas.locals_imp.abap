@@ -421,11 +421,20 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
           ADD 1 TO lv_objkey_pos.
 *       object name
         ELSEIF <ls_object_table>-tobjkey+lv_next_objkey_pos(1) = '&'.
+          "TODO
           ls_objkey-value = mv_object_name.
-* #CP-SUPPRESS: FP no risc
-          INSERT ls_objkey INTO TABLE lt_objkey.
+*    The object name might comprise multiple key components (e. g. WDCC)
+*    This string needs to be split
+          distribute_name_to_components(
+            EXPORTING
+              it_key_component = lt_key_component
+            CHANGING
+              ct_objkey        = lt_objkey
+              cs_objkey        = ls_objkey
+              cv_non_value_pos = lv_non_value_pos
+          ).
           CLEAR ls_objkey.
-          ADD 1 TO lv_non_value_pos.
+*          ADD 1 TO lv_non_value_pos.
           ADD 1 TO lv_objkey_pos.
 *       language
         ELSEIF <ls_object_table>-tobjkey+lv_next_objkey_pos(1) = 'L'.
@@ -451,6 +460,8 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
 
       ADD 1 TO lv_objkey_pos.
     ENDWHILE.
+
+*    Similarly to that, fixed values might be supplied in the object key which actually make up key components
     IF NOT ls_objkey-value IS INITIAL.
       split_value_to_keys(
             EXPORTING
@@ -640,6 +651,8 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
 
     lt_key_component_uncovered = it_key_component.
     DATA ls_dummy LIKE LINE OF ct_objkey.
+
+*    we want to fill the atribute values which are not covered by explicit key components yet
     LOOP AT ct_objkey INTO ls_dummy.
       DELETE lt_key_component_uncovered INDEX 1.
     ENDLOOP.
@@ -666,6 +679,57 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
       ENDIF.
     ENDLOOP.
 
+  ENDMETHOD.
+
+  METHOD distribute_name_to_components.
+    DATA lt_key_component_uncovered TYPE lcl_tlogo_bridge=>ty_s_object_table-field_catalog.
+    DATA ls_key_component_uncovered TYPE lif_external_object_container=>ty_s_component.
+    DATA ls_dummy LIKE LINE OF ct_objkey.
+    DATA ls_objkey_sub     LIKE cs_objkey.
+    DATA lv_objkey_sub_pos TYPE i.
+
+    lt_key_component_uncovered = it_key_component.
+    ls_objkey_sub-num = cs_objkey-num.
+    lv_objkey_sub_pos = 0.
+
+*    we want to fill the atribute values which are not covered by explicit key components yet
+    DATA lv_count_components_covered LIKE ls_objkey_sub-num.
+    lv_count_components_covered = ls_objkey_sub-num - 1.
+    DO lv_count_components_covered TIMES.
+      DELETE lt_key_component_uncovered INDEX 1.
+    ENDDO.
+
+    LOOP AT lt_key_component_uncovered INTO ls_key_component_uncovered.
+      CLEAR ls_objkey_sub-value.
+      DATA lv_len LIKE ls_key_component_uncovered-length.
+
+*      Some datatype used in the key might exceed the total remaining characters length (e. g. SICF)
+      TRY.
+          DATA(lv_remaining_length) = strlen( |{ substring( val = cs_objkey-value off = lv_objkey_sub_pos ) }| ).
+        CATCH cx_sy_range_out_of_bounds.
+          lv_remaining_length = 0.
+          RETURN. ">>>>>>>>>>>>>>>>>>>>>>>>>>>
+      ENDTRY.
+      IF ls_key_component_uncovered-length <= lv_remaining_length.
+        lv_len = ls_key_component_uncovered-length.
+      ELSE.
+        lv_len = lv_remaining_length.
+      ENDIF.
+
+      ls_objkey_sub-value = |{ substring( val = cs_objkey-value off = lv_objkey_sub_pos len = lv_len ) }| .
+      ls_objkey_sub-num = cv_non_value_pos.
+
+      INSERT ls_objkey_sub INTO TABLE ct_objkey.
+
+      ADD ls_key_component_uncovered-length TO lv_objkey_sub_pos.
+      ADD 1 TO cv_non_value_pos.
+      CLEAR ls_objkey_sub.
+
+      IF lv_objkey_sub_pos = strlen( cs_objkey-value ).
+        cs_objkey-num = cv_non_value_pos.
+        EXIT. "end splitting - all characters captured
+      ENDIF.
+    ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.
