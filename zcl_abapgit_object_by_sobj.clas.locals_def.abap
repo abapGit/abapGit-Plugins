@@ -196,4 +196,12 @@ CLASS lcl_tlogo_bridge DEFINITION.
         cs_objkey        TYPE lcl_tlogo_bridge=>ty_s_objkey
         cv_non_value_pos TYPE numc3.
 
+    methods distribute_name_to_components
+      IMPORTING
+        it_key_component TYPE lcl_tlogo_bridge=>ty_s_object_table-field_catalog
+      CHANGING
+        ct_objkey        TYPE lcl_tlogo_bridge=>ty_t_objkey
+        cs_objkey        TYPE lcl_tlogo_bridge=>ty_s_objkey
+        cv_non_value_pos TYPE numc3.
+
 ENDCLASS.
