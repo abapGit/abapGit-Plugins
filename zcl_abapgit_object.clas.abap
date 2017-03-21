@@ -61,8 +61,10 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
 
   METHOD change_object_directory_entry.
 
-    DATA lv_tadir_object TYPE trobjtype.
-    DATA lv_exception_text TYPE string.
+    DATA: lv_tadir_object   TYPE trobjtype,
+          lv_exception_text TYPE string.
+
+
     lv_tadir_object = mv_obj_type.
 
     CALL FUNCTION 'TR_TADIR_INTERFACE'
@@ -73,6 +75,7 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
         wi_tadir_object                = lv_tadir_object    " Input for TADIR field OBJECT
         wi_tadir_obj_name              = mv_obj_name    " Input for TADIR field OBJ_NAME
         wi_tadir_devclass              = iv_package
+        iv_delflag                     = abap_false
       EXCEPTIONS
         tadir_entry_not_existing       = 1
         tadir_entry_ill_type           = 2
@@ -110,8 +113,8 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
 
 
   METHOD create_tadir_entry.
-    me->change_object_directory_entry(  iv_package = iv_package
-                                        iv_delete = abap_false ).
+    me->change_object_directory_entry( iv_package = iv_package
+                                       iv_delete  = abap_false ).
   ENDMETHOD.
 
 
