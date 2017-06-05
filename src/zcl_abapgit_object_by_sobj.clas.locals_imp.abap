@@ -13,7 +13,7 @@ CLASS lcl_catalog IMPLEMENTATION.
 
 
     lo_structdescr ?= cl_abap_structdescr=>describe_by_name( iv_tobj_name ).
-    IF sy-subrc NE 0.
+    IF sy-subrc <> 0.
       RAISE EXCEPTION TYPE lcx_obj_exception
         EXPORTING
           iv_text = |Structure of { iv_tobj_name } corrupt|.
@@ -29,7 +29,7 @@ CLASS lcl_catalog IMPLEMENTATION.
       EXCEPTIONS
         not_found = 1
         OTHERS    = 2.
-    IF sy-subrc NE 0.
+    IF sy-subrc <> 0.
       RAISE EXCEPTION TYPE lcx_obj_exception
         EXPORTING
           iv_text = |Structure of { iv_tobj_name } corrupt|.
@@ -132,7 +132,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
     IF sy-subrc <> 0.
 *    Fallback. For some objects, no primary table is explicitly flagged
 *    The, the one with only one key field shall be chosen
-      READ TABLE mt_object_table INTO rs_object_table WITH KEY tobjkey = '/&'.
+      READ TABLE mt_object_table INTO rs_object_table WITH KEY tobjkey = '/&'. "#EC CI_SUBRC
     ENDIF.
     IF rs_object_table IS INITIAL.
       RAISE EXCEPTION TYPE lcx_obj_exception
@@ -174,8 +174,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
       EXPORTING
         it_relevant_table   = lt_relevant_table
       IMPORTING
-        et_table_content  = lt_imported_table_content
-    ).
+        et_table_content  = lt_imported_table_content ).
 
 *  validate the content to be imported: Based on the keys of the current system's primary-table,
 *  the content to be imported must provide exactly one item!
@@ -188,7 +187,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
 
     READ TABLE lt_imported_table_content ASSIGNING <ls_imported_prim_tab_content>
       WITH TABLE KEY tabname = ls_primary_table-tobj_name.
-    IF sy-subrc NE 0.
+    IF sy-subrc <> 0.
       RAISE EXCEPTION TYPE lcx_obj_exception
         EXPORTING
           iv_text = |Primary table { ls_primary_table-tobj_name } not found in imported container |.
@@ -300,7 +299,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
     READ TABLE mt_object_method ASSIGNING <ls_object_method>
       WITH TABLE KEY
         objectname = mv_object
-        objecttype = 'L' ##no_text
+        objecttype = 'L'
         method = 'BEFORE_EXP' ##no_text.
 
     IF sy-subrc = 0.
@@ -331,7 +330,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
     READ TABLE mt_object_method ASSIGNING <ls_object_method>
       WITH TABLE KEY
         objectname = mv_object
-        objecttype = 'L' ##no_text
+        objecttype = 'L'
         method = 'AFTER_IMP' ##no_text.
 
     IF sy-subrc = 0.
@@ -431,8 +430,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
             CHANGING
               ct_objkey        = lt_objkey
               cs_objkey        = ls_objkey
-              cv_non_value_pos = lv_non_value_pos
-          ).
+              cv_non_value_pos = lv_non_value_pos ).
           CLEAR ls_objkey.
 *          ADD 1 TO lv_non_value_pos.
           ADD 1 TO lv_objkey_pos.
@@ -483,13 +481,11 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
     lv_key_pos = 1.
 
     LOOP AT <ls_object_table>-field_catalog ASSIGNING <ls_table_field>
-      USING KEY is_key
-      WHERE is_key = abap_true.
+        USING KEY is_key WHERE is_key = abap_true.
 * #CP-SUPPRESS: FP no risc
       READ TABLE lt_objkey INTO ls_objkey
         WITH TABLE KEY num = lv_key_pos.
-      IF sy-subrc <> 0
-      OR <ls_table_field>-name = 'LANGU'.
+      IF sy-subrc <> 0 OR <ls_table_field>-name = 'LANGU'.
         CLEAR ls_objkey.
         ADD 1 TO lv_key_pos.
         CONTINUE.
@@ -570,7 +566,8 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
 
     ev_is_identical = abap_true.
     LOOP AT it_local_fieldcatalog INTO ls_local_field_def.
-      READ TABLE it_imported_fieldcatalog INTO ls_imported_field_def WITH KEY name COMPONENTS name = ls_local_field_def-name.
+      READ TABLE it_imported_fieldcatalog INTO ls_imported_field_def
+        WITH KEY name COMPONENTS name = ls_local_field_def-name. "#EC CI_SUBRC
 
 *      The position of the attribute is not relevant with respect to comparison
       CLEAR: ls_imported_field_def-pos,
@@ -716,7 +713,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
         lv_len = lv_remaining_length.
       ENDIF.
 
-      ls_objkey_sub-value = |{ substring( val = cs_objkey-value off = lv_objkey_sub_pos len = lv_len ) }| .
+      ls_objkey_sub-value = |{ substring( val = cs_objkey-value off = lv_objkey_sub_pos len = lv_len ) }|.
       ls_objkey_sub-num = cv_non_value_pos.
 
       INSERT ls_objkey_sub INTO TABLE ct_objkey.
@@ -776,11 +773,12 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD lif_external_object_container~get_persisted_table_content.
-    DATA lx_abapgit_object  TYPE REF TO zcx_abapgit_object.
-    DATA ls_table_content   LIKE LINE OF et_table_content.
+    DATA: lx_abapgit_object TYPE REF TO zcx_abapgit_object,
+          ls_table_content  LIKE LINE OF et_table_content.
 
-    FIELD-SYMBOLS <lt_data>             TYPE ANY TABLE.
-    FIELD-SYMBOLS <ls_table_content>    LIKE LINE OF et_table_content.
+    FIELD-SYMBOLS: <lt_data>          TYPE ANY TABLE,
+                   <ls_table_content> LIKE LINE OF et_table_content.
+
 
     LOOP AT it_relevant_table INTO ls_table_content-tabname.
       INSERT ls_table_content INTO TABLE et_table_content ASSIGNING <ls_table_content>.
@@ -793,10 +791,9 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
 
           mo_xml_input->read(
             EXPORTING
-              iv_name            = |{ <ls_table_content>-tabname }{ co_suffix_fieldcat }|
+              iv_name = |{ <ls_table_content>-tabname }{ co_suffix_fieldcat }|
             CHANGING
-              cg_data            = <ls_table_content>-field_catalog
-          ).
+              cg_data = <ls_table_content>-field_catalog ).
         CATCH zcx_abapgit_object INTO lx_abapgit_object.
           RAISE EXCEPTION TYPE lcx_obj_exception
             EXPORTING
@@ -830,11 +827,10 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
 *    Read the persisted data
       TRY.
           mo_xml_input->read(
-          EXPORTING
-            iv_name            = |{ <ls_table_content>-tabname }|
+            EXPORTING
+              iv_name = |{ <ls_table_content>-tabname }|
             CHANGING
-              cg_data          = <lt_data> ).
-
+              cg_data = <lt_data> ).
 
         CATCH zcx_abapgit_object INTO lx_abapgit_object.
           RAISE EXCEPTION TYPE lcx_obj_exception
@@ -868,30 +864,30 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
       ls_component-name = <ls_field_catalog>-name.
       TRY.
           CASE <ls_field_catalog>-type_kind.
-            WHEN    cl_abap_typedescr=>typekind_char
-                OR  cl_abap_typedescr=>typekind_clike
-                OR  cl_abap_typedescr=>typekind_csequence.
+            WHEN cl_abap_typedescr=>typekind_char
+                OR cl_abap_typedescr=>typekind_clike
+                OR cl_abap_typedescr=>typekind_csequence.
               ls_component-type = cl_abap_elemdescr=>get_c( <ls_field_catalog>-length ).
             WHEN cl_abap_typedescr=>typekind_date.
               ls_component-type = cl_abap_elemdescr=>get_d( ).
             WHEN cl_abap_typedescr=>typekind_decfloat
-            OR  cl_abap_typedescr=>typekind_float.
+                OR cl_abap_typedescr=>typekind_float.
               ls_component-type = cl_abap_elemdescr=>get_f( ).
-            WHEN  cl_abap_typedescr=>typekind_decfloat16.
+            WHEN cl_abap_typedescr=>typekind_decfloat16.
               ls_component-type = cl_abap_elemdescr=>get_decfloat16( ).
-            WHEN  cl_abap_typedescr=>typekind_decfloat34.
+            WHEN cl_abap_typedescr=>typekind_decfloat34.
               ls_component-type = cl_abap_elemdescr=>get_decfloat34( ).
             WHEN cl_abap_typedescr=>typekind_hex.
               ls_component-type = cl_abap_elemdescr=>get_x( <ls_field_catalog>-length ).
-            WHEN  cl_abap_typedescr=>typekind_int
-              OR  cl_abap_typedescr=>typekind_int1
-              OR  cl_abap_typedescr=>typekind_int2
-              OR  cl_abap_typedescr=>typekind_simple.
+            WHEN cl_abap_typedescr=>typekind_int
+                OR cl_abap_typedescr=>typekind_int1
+                OR cl_abap_typedescr=>typekind_int2
+                OR cl_abap_typedescr=>typekind_simple.
               ls_component-type = cl_abap_elemdescr=>get_i( ).
-            WHEN  cl_abap_typedescr=>typekind_num
-              OR  cl_abap_typedescr=>typekind_numeric.
+            WHEN cl_abap_typedescr=>typekind_num
+                OR cl_abap_typedescr=>typekind_numeric.
               ls_component-type = cl_abap_elemdescr=>get_n( <ls_field_catalog>-length ).
-            WHEN  cl_abap_typedescr=>typekind_packed.
+            WHEN cl_abap_typedescr=>typekind_packed.
               ls_component-type = cl_abap_elemdescr=>get_p(
                 p_length   = <ls_field_catalog>-length
                 p_decimals = <ls_field_catalog>-decimals ).
@@ -900,7 +896,7 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
             WHEN cl_abap_typedescr=>typekind_string.
               ls_component-type = cl_abap_elemdescr=>get_string( ).
             WHEN cl_abap_typedescr=>typekind_xsequence
-              OR cl_abap_typedescr=>typekind_xstring.
+                OR cl_abap_typedescr=>typekind_xstring.
               ls_component-type = cl_abap_elemdescr=>get_xstring( ).
             WHEN OTHERS.
               RAISE EXCEPTION TYPE lcx_obj_exception

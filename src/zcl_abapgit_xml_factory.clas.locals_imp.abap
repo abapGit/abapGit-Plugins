@@ -1,4 +1,4 @@
-CLASS lcl_xml_output DEFINITION.
+CLASS lcl_xml_output DEFINITION FINAL.
   PUBLIC SECTION.
     INTERFACES zif_abapgit_xml_output.
 
@@ -44,7 +44,7 @@ CLASS lcl_xml_output IMPLEMENTATION.
 
 ENDCLASS.
 
-CLASS lcl_xml_input DEFINITION.
+CLASS lcl_xml_input DEFINITION FINAL.
   PUBLIC SECTION.
     INTERFACES zif_abapgit_xml_input.
 

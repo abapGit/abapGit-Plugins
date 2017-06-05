@@ -30,15 +30,18 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
 
 
   METHOD class_constructor.
-    DATA lt_all_objectname  TYPE STANDARD TABLE OF objh-objectname WITH DEFAULT KEY.
-    DATA lv_objectname      LIKE LINE OF lt_all_objectname.
-    DATA lv_obj_type        LIKE LINE OF gt_supported_obj_types.
+
+    DATA: lt_all_objectname TYPE STANDARD TABLE OF objh-objectname WITH DEFAULT KEY,
+          lv_objectname     LIKE LINE OF lt_all_objectname,
+          lv_obj_type       LIKE LINE OF gt_supported_obj_types.
+
 
     gv_serializer_classname = 'ZCL_ABAPGIT_OBJECT_BY_SOBJ'.
     gv_serializer_version   = '1.0'.
 
-    SELECT objectname FROM objh INTO TABLE lt_all_objectname
-           WHERE objecttype = 'L'.
+    SELECT objectname FROM objh
+      INTO TABLE lt_all_objectname
+      WHERE objecttype = 'L'.                           "#EC CI_GENBUFF
 
     LOOP AT lt_all_objectname INTO lv_objectname.
       IF strlen( lv_objectname ) <= 4.

@@ -2,7 +2,7 @@ CLASS lcl_test_bridge DEFINITION INHERITING FROM lcl_tlogo_bridge.
   PUBLIC SECTION.
     METHODS expose_where_clause
       IMPORTING iv_table_name           TYPE sobj_name
-      RETURNING value(rv_where_on_keys) TYPE string.
+      RETURNING VALUE(rv_where_on_keys) TYPE string.
 
     METHODS constructor
       IMPORTING iv_object      TYPE trobjtype
@@ -47,11 +47,11 @@ CLASS ltcl_catalog IMPLEMENTATION.
 
 
 * make sure the database table exists in system
-    CALL METHOD cl_abap_structdescr=>describe_by_name
+    cl_abap_structdescr=>describe_by_name(
       EXPORTING
         p_name         = lc_tab
       EXCEPTIONS
-        type_not_found = 1.
+        type_not_found = 1 ).
     IF sy-subrc <> 0.
       RETURN.
     ENDIF.
@@ -205,11 +205,11 @@ CLASS ltcl_bobf DEFINITION FINAL FOR TESTING
       t200_delete_object        FOR TESTING RAISING cx_static_check.
 
     METHODS get_bobf_container
-      RETURNING value(ro_container) TYPE REF TO lcl_abapgit_xml_container
+      RETURNING VALUE(ro_container) TYPE REF TO lcl_abapgit_xml_container
       RAISING   cx_static_check.
 
     METHODS get_bopf_persisted_string
-      RETURNING value(rv_xml) TYPE string.
+      RETURNING VALUE(rv_xml) TYPE string.
 ENDCLASS.
 
 
@@ -228,20 +228,20 @@ CLASS ltcl_bobf IMPLEMENTATION.
             iv_object      = 'BOBF'
             iv_object_name = 'ZABAPGIT_UNITTEST'.
       CATCH cx_root.
-        cl_aunit_assert=>fail(
-            msg    = 'BOPF not available in this system. Test cannot be executed'
-            level  = cl_aunit_assert=>tolerable
-            quit   = cl_aunit_assert=>class ).
+        cl_abap_unit_assert=>fail(
+          msg   = 'BOPF not available in this system. Test cannot be executed'
+          level = cl_aunit_assert=>tolerable
+          quit  = cl_aunit_assert=>class ).
     ENDTRY.
 
 *    purge existing object if it exists from previous execution
     go_bridge->delete_object_on_db( ).
 
 *    create ddic-structures which are needed by the BOPF runtime lateron
-    DATA ls_dd02v       TYPE dd02v.
-    DATA lt_dd03p       TYPE dd03ptab.
-    DATA ls_dd03p       LIKE LINE OF lt_dd03p.
-    DATA lv_ddobjname   TYPE ddobjname.
+    DATA: ls_dd02v     TYPE dd02v,
+          lt_dd03p     TYPE dd03ptab,
+          ls_dd03p     LIKE LINE OF lt_dd03p,
+          lv_ddobjname TYPE ddobjname.
 
 *    data structure ZAGUT_S_ROOT_D
     CLEAR: ls_dd02v, lt_dd03p, ls_dd03p.
@@ -378,16 +378,14 @@ CLASS ltcl_bobf IMPLEMENTATION.
 
     CALL FUNCTION 'DDIF_TTYP_PUT'
       EXPORTING
-        name     = lv_ddobjname    " Name of Table Type to be Written
-        dd40v_wa = ls_dd40v    " Header of Table Type
-*      TABLES
-*       dd42v_tab         = dd42v_tab    " Key Fields of Table Type
+        name     = lv_ddobjname
+        dd40v_wa = ls_dd40v
       EXCEPTIONS
         OTHERS   = 6.
     ASSERT sy-subrc = 0.
     CALL FUNCTION 'DDIF_TTYP_ACTIVATE'
       EXPORTING
-        name   = lv_ddobjname    " Name of Table Type to be Activated
+        name   = lv_ddobjname
       EXCEPTIONS
         OTHERS = 3.
     ASSERT sy-subrc = 0.
@@ -398,8 +396,8 @@ CLASS ltcl_bobf IMPLEMENTATION.
 
     CALL FUNCTION 'DDIF_OBJECT_DELETE'
       EXPORTING
-        type          = 'TTYP'    " Type of ABAP Dictionary object to be deleted
-        name          = 'ZAGUT_T_ROOT'    " Name of ABAP Dictionary object to be deleted
+        type          = 'TTYP'
+        name          = 'ZAGUT_T_ROOT'
       IMPORTING
         deleted       = lv_deleted
       EXCEPTIONS
@@ -411,8 +409,8 @@ CLASS ltcl_bobf IMPLEMENTATION.
 
     CALL FUNCTION 'DDIF_OBJECT_DELETE'
       EXPORTING
-        type          = 'TABL'    " Type of ABAP Dictionary object to be deleted
-        name          = 'ZAGUT_S_ROOT'    " Name of ABAP Dictionary object to be deleted
+        type          = 'TABL'
+        name          = 'ZAGUT_S_ROOT'
       IMPORTING
         deleted       = lv_deleted
       EXCEPTIONS
@@ -424,8 +422,8 @@ CLASS ltcl_bobf IMPLEMENTATION.
 
     CALL FUNCTION 'DDIF_OBJECT_DELETE'
       EXPORTING
-        type          = 'TABL'    " Type of ABAP Dictionary object to be deleted
-        name          = 'ZAGUT_D_ROOT'    " Name of ABAP Dictionary object to be deleted
+        type          = 'TABL'
+        name          = 'ZAGUT_D_ROOT'
       IMPORTING
         deleted       = lv_deleted
       EXCEPTIONS
@@ -437,8 +435,8 @@ CLASS ltcl_bobf IMPLEMENTATION.
 
     CALL FUNCTION 'DDIF_OBJECT_DELETE'
       EXPORTING
-        type          = 'TABL'    " Type of ABAP Dictionary object to be deleted
-        name          = 'ZAGUT_S_ROOT_D'    " Name of ABAP Dictionary object to be deleted
+        type          = 'TABL'
+        name          = 'ZAGUT_S_ROOT_D'
       IMPORTING
         deleted       = lv_deleted
       EXCEPTIONS
@@ -497,15 +495,16 @@ CLASS ltcl_bobf IMPLEMENTATION.
     "(lcl_xml_output) and in- and out are two different instances...
 
     lo_renderer = lo_ixml->create_renderer(
-                  document = lo_document
-                  ostream  = lo_ixml->create_stream_factory( )->create_ostream_cstring( lv_xml_string )
-              ).
+      document = lo_document
+      ostream  = lo_ixml->create_stream_factory( )->create_ostream_cstring( lv_xml_string ) ).
 
 *    we should not compare the complete string, as the root element contains e. g. the encoding and version.
 *    start with the first _- which is the escaped slash of the first BOPF table
-    cl_abap_unit_assert=>assert_equals( msg = |Rendered string and input string don't match|
-                                        exp = substring_after( val = me->get_bopf_persisted_string( ) sub = '_-' )
-                                        act = substring_after( val = lv_xml_string                    sub = '_-' ) ).
+    cl_abap_unit_assert=>assert_equals(
+      msg = |Rendered string and input string don't match|
+      exp = substring_after( val = me->get_bopf_persisted_string( ) sub = '_-' )
+      act = substring_after( val = lv_xml_string                    sub = '_-' ) ).
+
   ENDMETHOD.
 
   METHOD t100_use_imported_object.

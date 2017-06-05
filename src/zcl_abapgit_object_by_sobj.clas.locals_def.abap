@@ -168,7 +168,6 @@ CLASS lcl_tlogo_bridge DEFINITION.
         it_data       TYPE STANDARD TABLE.
 
   PRIVATE SECTION.
-
     TYPES: BEGIN OF ty_s_objkey,
              num   TYPE numc3,
              value TYPE char128,
@@ -196,7 +195,7 @@ CLASS lcl_tlogo_bridge DEFINITION.
         cs_objkey        TYPE lcl_tlogo_bridge=>ty_s_objkey
         cv_non_value_pos TYPE numc3.
 
-    methods distribute_name_to_components
+    METHODS distribute_name_to_components
       IMPORTING
         it_key_component TYPE lcl_tlogo_bridge=>ty_s_object_table-field_catalog
       CHANGING
