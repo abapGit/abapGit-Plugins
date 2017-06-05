@@ -107,7 +107,7 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
                  WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO lv_exception_text.
       RAISE EXCEPTION TYPE zcx_abapgit_object
         EXPORTING
-          iv_text = lv_exception_text.
+          text = lv_exception_text.
     ENDIF.
   ENDMETHOD.
 

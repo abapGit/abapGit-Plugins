@@ -1,19 +1,22 @@
-CLASS zcx_abapgit_object DEFINITION
-  PUBLIC
-  INHERITING FROM cx_static_check
-  CREATE PUBLIC .
+class ZCX_ABAPGIT_OBJECT definition
+  public
+  inheriting from CX_STATIC_CHECK
+  create public .
 
-  PUBLIC SECTION.
-    DATA mv_text TYPE string.
+public section.
 
-    METHODS constructor
-      IMPORTING
-        !iv_text  TYPE string OPTIONAL
-        !previous LIKE previous OPTIONAL .
+  data TEXT type STRING read-only .
 
-    METHODS get_text REDEFINITION.
-  PROTECTED SECTION.
-  PRIVATE SECTION.
+  methods CONSTRUCTOR
+    importing
+      !TEXTID like TEXTID optional
+      !PREVIOUS like PREVIOUS optional
+      !TEXT type STRING optional .
+
+  methods IF_MESSAGE~GET_TEXT
+    redefinition .
+protected section.
+private section.
 ENDCLASS.
 
 
@@ -21,20 +24,23 @@ ENDCLASS.
 CLASS ZCX_ABAPGIT_OBJECT IMPLEMENTATION.
 
 
-  METHOD constructor ##ADT_SUPPRESS_GENERATION.
-    CALL METHOD super->constructor
-      EXPORTING
-        previous = previous.
+  method CONSTRUCTOR.
+CALL METHOD SUPER->CONSTRUCTOR
+EXPORTING
+TEXTID = TEXTID
+PREVIOUS = PREVIOUS
+.
+me->TEXT = TEXT .
+  endmethod.
 
-    mv_text = iv_text.
-  ENDMETHOD.
 
+  METHOD IF_MESSAGE~GET_TEXT.
 
-  METHOD get_text.
-    IF mv_text IS NOT INITIAL.
-      result = mv_text.
+    IF text IS NOT INITIAL.
+      result = text.
     ELSE.
-      super->get_text( ).
+      result = super->get_text( ).
     ENDIF.
+
   ENDMETHOD.
 ENDCLASS.

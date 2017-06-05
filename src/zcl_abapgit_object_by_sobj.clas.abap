@@ -66,7 +66,7 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
         CATCH lcx_obj_exception INTO lx_bridge_creation.
           RAISE EXCEPTION TYPE zcx_abapgit_object
             EXPORTING
-              iv_text  = lx_bridge_creation->get_text( )
+              text     = lx_bridge_creation->get_text( )
               previous = lx_bridge_creation.
       ENDTRY.
     ENDIF.
@@ -95,7 +95,7 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
       CATCH lcx_obj_exception INTO lx_obj_exception.
         RAISE EXCEPTION TYPE zcx_abapgit_object
           EXPORTING
-            iv_text  = |{ mv_obj_type } { mv_obj_name }: {
+            text     = |{ mv_obj_type } { mv_obj_name }: {
                         lx_obj_exception->get_error_text( ) }|
             previous = lx_obj_exception.
     ENDTRY.
@@ -105,12 +105,9 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
 
 
   METHOD zif_abapgit_plugin~exists.
-    DATA lx_obj_exception  TYPE REF TO lcx_obj_exception.
-
     TRY.
         rv_bool = get_tlogo_bridge( )->instance_exists( ).
-
-      CATCH lcx_obj_exception INTO lx_obj_exception.
+      CATCH lcx_obj_exception.
         rv_bool = abap_false.
     ENDTRY.
   ENDMETHOD.
@@ -143,7 +140,7 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
       CATCH lcx_obj_exception INTO lx_obj_exception.
         RAISE EXCEPTION TYPE zcx_abapgit_object
           EXPORTING
-            iv_text  = lx_obj_exception->get_text( )
+            text     = lx_obj_exception->get_text( )
             previous = lx_obj_exception.
     ENDTRY.
   ENDMETHOD.
