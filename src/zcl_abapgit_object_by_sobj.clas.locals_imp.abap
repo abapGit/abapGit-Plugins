@@ -702,7 +702,8 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
 
 *      Some datatype used in the key might exceed the total remaining characters length (e. g. SICF)
       TRY.
-          DATA(lv_remaining_length) = strlen( |{ substring( val = cs_objkey-value off = lv_objkey_sub_pos ) }| ).
+         DATA: lv_remaining_length TYPE i.
+          lv_remaining_length = strlen( |{ substring( val = cs_objkey-value off = lv_objkey_sub_pos ) }| ).
         CATCH cx_sy_range_out_of_bounds.
           lv_remaining_length = 0.
           RETURN. ">>>>>>>>>>>>>>>>>>>>>>>>>>>
