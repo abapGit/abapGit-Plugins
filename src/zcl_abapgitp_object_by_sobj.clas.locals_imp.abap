@@ -702,7 +702,7 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
 
 *      Some datatype used in the key might exceed the total remaining characters length (e. g. SICF)
       TRY.
-         DATA: lv_remaining_length TYPE i.
+          DATA: lv_remaining_length TYPE i.
           lv_remaining_length = strlen( |{ substring( val = cs_objkey-value off = lv_objkey_sub_pos ) }| ).
         CATCH cx_sy_range_out_of_bounds.
           lv_remaining_length = 0.
@@ -753,7 +753,7 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
 
   METHOD lif_external_object_container~store_obj_table.
 
-    DATA lx_abapgit_object TYPE REF TO zcx_abapgit_object.
+    DATA lx_abapgit_object TYPE REF TO zcx_abapgitp_object.
 
     FIELD-SYMBOLS <lt_data>             TYPE ANY TABLE.
 
@@ -765,7 +765,7 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
         mo_xml_output->add( iv_name = |{ is_table_content-tabname }{ co_suffix_fieldcat }|
                             ig_data = is_table_content-field_catalog ).
 
-      CATCH zcx_abapgit_object INTO lx_abapgit_object.
+      CATCH zcx_abapgitp_object INTO lx_abapgit_object.
         RAISE EXCEPTION TYPE lcx_obj_exception
           EXPORTING
             iv_text  = lx_abapgit_object->get_text( )
@@ -774,7 +774,7 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD lif_external_object_container~get_persisted_table_content.
-    DATA: lx_abapgit_object TYPE REF TO zcx_abapgit_object,
+    DATA: lx_abapgit_object TYPE REF TO zcx_abapgitp_object,
           ls_table_content  LIKE LINE OF et_table_content.
 
     FIELD-SYMBOLS: <lt_data>          TYPE ANY TABLE,
@@ -795,7 +795,7 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
               iv_name = |{ <ls_table_content>-tabname }{ co_suffix_fieldcat }|
             CHANGING
               cg_data = <ls_table_content>-field_catalog ).
-        CATCH zcx_abapgit_object INTO lx_abapgit_object.
+        CATCH zcx_abapgitp_object INTO lx_abapgit_object.
           RAISE EXCEPTION TYPE lcx_obj_exception
             EXPORTING
               iv_text  = lx_abapgit_object->get_text( )
@@ -833,7 +833,7 @@ CLASS lcl_abapgit_xml_container IMPLEMENTATION.
             CHANGING
               cg_data = <lt_data> ).
 
-        CATCH zcx_abapgit_object INTO lx_abapgit_object.
+        CATCH zcx_abapgitp_object INTO lx_abapgit_object.
           RAISE EXCEPTION TYPE lcx_obj_exception
             EXPORTING
               iv_text  = lx_abapgit_object->get_text( )
