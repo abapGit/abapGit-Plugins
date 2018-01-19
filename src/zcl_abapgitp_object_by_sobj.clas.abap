@@ -1,32 +1,31 @@
-CLASS zcl_abapgit_object_by_sobj DEFINITION
+CLASS zcl_abapgitp_object_by_sobj DEFINITION
   PUBLIC
-  INHERITING FROM zcl_abapgit_object
+  INHERITING FROM zcl_abapgitp_object
   CREATE PUBLIC .
 
   PUBLIC SECTION.
-    INTERFACES zif_abapgit_plugin.
 
-    CLASS-METHODS class_constructor.
+    INTERFACES zif_abapgitp_plugin .
 
-    METHODS get_supported_obj_types REDEFINITION.
+    CLASS-METHODS class_constructor .
 
+    METHODS get_supported_obj_types
+        REDEFINITION .
   PROTECTED SECTION.
-
   PRIVATE SECTION.
 
     METHODS get_tlogo_bridge
       RETURNING VALUE(ro_tlogo_bridge) TYPE REF TO lcl_tlogo_bridge
-      RAISING   zcx_abapgit_object.
+      RAISING   zcx_abapgitp_object.
 
     DATA mo_tlogo_bridge TYPE REF TO lcl_tlogo_bridge.
 
     CLASS-DATA gt_supported_obj_types TYPE objtyptable.
-
 ENDCLASS.
 
 
 
-CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
+CLASS ZCL_ABAPGITP_OBJECT_BY_SOBJ IMPLEMENTATION.
 
 
   METHOD class_constructor.
@@ -67,7 +66,7 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
               iv_object      = mv_obj_type
               iv_object_name = mv_obj_name.
         CATCH lcx_obj_exception INTO lx_bridge_creation.
-          RAISE EXCEPTION TYPE zcx_abapgit_object
+          RAISE EXCEPTION TYPE zcx_abapgitp_object
             EXPORTING
               text     = lx_bridge_creation->get_text( )
               previous = lx_bridge_creation.
@@ -78,14 +77,14 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD zif_abapgit_plugin~delete.
+  METHOD zif_abapgitp_plugin~delete.
 
     get_tlogo_bridge( )->delete_object_on_db( ).
 
   ENDMETHOD.
 
 
-  METHOD zif_abapgit_plugin~deserialize.
+  METHOD zif_abapgitp_plugin~deserialize.
     DATA lo_object_container TYPE REF TO lcl_abapgit_xml_container.
     DATA lx_obj_exception  TYPE REF TO lcx_obj_exception.
 
@@ -96,7 +95,7 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
     TRY.
         get_tlogo_bridge( )->import_object( lo_object_container ).
       CATCH lcx_obj_exception INTO lx_obj_exception.
-        RAISE EXCEPTION TYPE zcx_abapgit_object
+        RAISE EXCEPTION TYPE zcx_abapgitp_object
           EXPORTING
             text     = |{ mv_obj_type } { mv_obj_name }: {
                         lx_obj_exception->get_error_text( ) }|
@@ -107,7 +106,7 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD zif_abapgit_plugin~exists.
+  METHOD zif_abapgitp_plugin~exists.
     TRY.
         rv_bool = get_tlogo_bridge( )->instance_exists( ).
       CATCH lcx_obj_exception.
@@ -116,18 +115,18 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD zif_abapgit_plugin~get_metadata.
+  METHOD zif_abapgitp_plugin~get_metadata.
     rs_metadata = get_metadata( ).
     rs_metadata-delete_tadir = abap_true.
   ENDMETHOD.
 
 
-  METHOD zif_abapgit_plugin~jump.
+  METHOD zif_abapgitp_plugin~jump.
     RETURN.
   ENDMETHOD.
 
 
-  METHOD zif_abapgit_plugin~serialize.
+  METHOD zif_abapgitp_plugin~serialize.
     DATA lo_object_container TYPE REF TO lcl_abapgit_xml_container.
     DATA lx_obj_exception  TYPE REF TO lcx_obj_exception.
 
@@ -141,7 +140,7 @@ CLASS ZCL_ABAPGIT_OBJECT_BY_SOBJ IMPLEMENTATION.
 
         ENDIF. "No else needed - if the object does not exist, we'll not serialize anything
       CATCH lcx_obj_exception INTO lx_obj_exception.
-        RAISE EXCEPTION TYPE zcx_abapgit_object
+        RAISE EXCEPTION TYPE zcx_abapgitp_object
           EXPORTING
             text     = lx_obj_exception->get_text( )
             previous = lx_obj_exception.

@@ -1,4 +1,4 @@
-class ZCX_ABAPGIT_OBJECT definition
+class ZCX_ABAPGITP_OBJECT definition
   public
   inheriting from CX_STATIC_CHECK
   create public .
@@ -21,7 +21,7 @@ ENDCLASS.
 
 
 
-CLASS ZCX_ABAPGIT_OBJECT IMPLEMENTATION.
+CLASS ZCX_ABAPGITP_OBJECT IMPLEMENTATION.
 
 
   method CONSTRUCTOR.

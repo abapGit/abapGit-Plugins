@@ -1,4 +1,4 @@
-INTERFACE zif_abapgit_plugin
+INTERFACE zif_abapgitp_plugin
   PUBLIC .
 
 
@@ -13,23 +13,23 @@ INTERFACE zif_abapgit_plugin
 
   METHODS serialize
     IMPORTING
-      !io_xml TYPE REF TO zif_abapgit_xml_output
+      !io_xml TYPE REF TO zif_abapgitp_xml_output
     RAISING
-      zcx_abapgit_object .
+      zcx_abapgitp_object .
   METHODS deserialize
     IMPORTING
       !iv_package TYPE devclass
-      !io_xml     TYPE REF TO zif_abapgit_xml_input
+      !io_xml     TYPE REF TO zif_abapgitp_xml_input
     RAISING
-      zcx_abapgit_object .
+      zcx_abapgitp_object .
   METHODS delete
     RAISING
-      zcx_abapgit_object .
+      zcx_abapgitp_object .
   METHODS exists
     RETURNING
       VALUE(rv_bool) TYPE abap_bool
     RAISING
-      zcx_abapgit_object .
+      zcx_abapgitp_object .
   METHODS jump .
   METHODS get_metadata
     RETURNING

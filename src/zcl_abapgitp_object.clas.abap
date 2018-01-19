@@ -1,7 +1,7 @@
-CLASS zcl_abapgit_object DEFINITION
+CLASS zcl_abapgitp_object DEFINITION
   PUBLIC
   ABSTRACT
-  CREATE PUBLIC.
+  CREATE PUBLIC .
 
   PUBLIC SECTION.
 
@@ -27,7 +27,7 @@ CLASS zcl_abapgit_object DEFINITION
         !io_xml     TYPE REF TO object
         !iv_package TYPE devclass
       RAISING
-        zcx_abapgit_object .
+        zcx_abapgitp_object .
   PROTECTED SECTION.
     CLASS-DATA   gv_serializer_classname TYPE string.
     CLASS-DATA   gv_serializer_version   TYPE string.
@@ -39,11 +39,10 @@ CLASS zcl_abapgit_object DEFINITION
       IMPORTING
         iv_package TYPE devclass
       RAISING
-        zcx_abapgit_object.
+        zcx_abapgitp_object.
 
     METHODS get_metadata
-      RETURNING VALUE(rs_metadata) TYPE zif_abapgit_plugin=>ty_metadata.
-
+      RETURNING VALUE(rs_metadata) TYPE zif_abapgitp_plugin=>ty_metadata.
   PRIVATE SECTION.
 
     METHODS change_object_directory_entry
@@ -51,12 +50,12 @@ CLASS zcl_abapgit_object DEFINITION
         iv_delete  TYPE abap_bool
         iv_package TYPE devclass
       RAISING
-        zcx_abapgit_object.
+        zcx_abapgitp_object.
 ENDCLASS.
 
 
 
-CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
+CLASS ZCL_ABAPGITP_OBJECT IMPLEMENTATION.
 
 
   METHOD change_object_directory_entry.
@@ -105,27 +104,27 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
     IF sy-subrc <> 0.
       MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
                  WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO lv_exception_text.
-      RAISE EXCEPTION TYPE zcx_abapgit_object
+      RAISE EXCEPTION TYPE zcx_abapgitp_object
         EXPORTING
           text = lv_exception_text.
     ENDIF.
   ENDMETHOD.
 
 
-  METHOD create_tadir_entry.
+  METHOD CREATE_TADIR_ENTRY.
     me->change_object_directory_entry( iv_package = iv_package
                                        iv_delete  = abap_false ).
   ENDMETHOD.
 
 
-  METHOD get_metadata.
+  METHOD GET_METADATA.
     ASSERT gv_serializer_classname IS NOT INITIAL. "needs to be provided in class-constructor of the inheriting class
     rs_metadata-class = gv_serializer_classname.
     rs_metadata-version = gv_serializer_version. "optional
   ENDMETHOD.
 
 
-  METHOD set_item.
+  METHOD SET_ITEM.
 
     mv_obj_type = iv_obj_type.
     mv_obj_name = iv_obj_name.
@@ -134,9 +133,9 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
 
 
   METHOD wrap_deserialize.
-    CALL METHOD me->('ZIF_ABAPGIT_PLUGIN~DESERIALIZE')
+    CALL METHOD me->('ZIF_ABAPGITP_PLUGIN~DESERIALIZE')
       EXPORTING
-        io_xml     = zcl_abapgit_xml_factory=>wrap_xml_input( io_xml )
+        io_xml     = zcl_abapgitp_xml_factory=>wrap_xml_input( io_xml )
         iv_package = iv_package.
   ENDMETHOD.
 
@@ -144,8 +143,8 @@ CLASS ZCL_ABAPGIT_OBJECT IMPLEMENTATION.
   METHOD wrap_serialize.
 *    This method wraps the interface method in order to have a typed signature at the plugin-interface
 *    while at the same time keeping the de-coupling of the ABAPGit Report and the plugins
-    CALL METHOD me->('ZIF_ABAPGIT_PLUGIN~SERIALIZE')
+    CALL METHOD me->('ZIF_ABAPGITP_PLUGIN~SERIALIZE')
       EXPORTING
-        io_xml = zcl_abapgit_xml_factory=>wrap_xml_output( io_xml ).
+        io_xml = zcl_abapgitp_xml_factory=>wrap_xml_output( io_xml ).
   ENDMETHOD.
 ENDCLASS.

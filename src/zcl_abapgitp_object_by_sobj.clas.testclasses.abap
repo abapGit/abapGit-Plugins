@@ -178,7 +178,7 @@ ENDCLASS.
 
 
 CLASS ltcl_bobf DEFINITION FINAL FOR TESTING
-  INHERITING FROM zcl_abapgit_object_by_sobj
+  INHERITING FROM zcl_abapgitp_object_by_sobj
   DURATION MEDIUM
   RISK LEVEL DANGEROUS.
 
@@ -485,7 +485,7 @@ CLASS ltcl_bobf IMPLEMENTATION.
     DATA lo_renderer        TYPE REF TO if_ixml_renderer.
 
     CREATE OBJECT lo_xml_container.
-    lo_xml_container->set_xml_output( zcl_abapgit_xml_factory=>create_xml_output( ) ).
+    lo_xml_container->set_xml_output( zcl_abapgitp_xml_factory=>create_xml_output( ) ).
 
     go_bridge->export_object( lo_xml_container ).
 
@@ -593,8 +593,8 @@ CLASS ltcl_bobf IMPLEMENTATION.
 
     CREATE OBJECT ro_container.
 
-    ro_container->set_xml_input( zcl_abapgit_xml_factory=>create_xml_input( iv_xml = me->get_bopf_persisted_string( ) ) ).
-    ro_container->set_xml_output( zcl_abapgit_xml_factory=>create_xml_output( ) ).
+    ro_container->set_xml_input( zcl_abapgitp_xml_factory=>create_xml_input( iv_xml = me->get_bopf_persisted_string( ) ) ).
+    ro_container->set_xml_output( zcl_abapgitp_xml_factory=>create_xml_output( ) ).
 
   ENDMETHOD.
 
