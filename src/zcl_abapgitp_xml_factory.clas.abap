@@ -27,8 +27,8 @@ CLASS zcl_abapgitp_xml_factory DEFINITION
         VALUE(ro_xml_proxy) TYPE REF TO zif_abapgitp_xml_output
       RAISING
         zcx_abapgitp_object .
-PROTECTED SECTION.
-PRIVATE SECTION.
+  PROTECTED SECTION.
+  PRIVATE SECTION.
 ENDCLASS.
 
 
@@ -36,39 +36,39 @@ ENDCLASS.
 CLASS ZCL_ABAPGITP_XML_FACTORY IMPLEMENTATION.
 
 
-  METHOD CREATE_XML_INPUT.
+  METHOD create_xml_input.
     DATA lo_wrapped_xml TYPE REF TO object.
 
-    IF iv_xml IS SUPPLIED.
-      CREATE OBJECT lo_wrapped_xml TYPE ('\PROGRAM=ZABAPGIT\CLASS=LCL_XML_INPUT')
-        EXPORTING
-          iv_xml   = iv_xml.
-    ELSE.
-      CREATE OBJECT lo_wrapped_xml TYPE ('\PROGRAM=ZABAPGIT\CLASS=LCL_XML_INPUT').
-    ENDIF.
+*    IF iv_xml IS SUPPLIED.
+    CREATE OBJECT lo_wrapped_xml TYPE zcl_abapgit_xml_input
+      EXPORTING
+        iv_xml = iv_xml.
+*    ELSE.
+*      CREATE OBJECT lo_wrapped_xml TYPE zcl_abapgit_xml_input.
+*    ENDIF.
 
     ro_xml_proxy = wrap_xml_input( lo_wrapped_xml ).
 
   ENDMETHOD.
 
 
-  METHOD CREATE_XML_OUTPUT.
+  METHOD create_xml_output.
     DATA lo_wrapped_xml TYPE REF TO object.
-    CREATE OBJECT lo_wrapped_xml TYPE ('\PROGRAM=ZABAPGIT\CLASS=LCL_XML_OUTPUT').
+    CREATE OBJECT lo_wrapped_xml TYPE zcl_abapgit_xml_output.
 
     ro_xml_proxy = wrap_xml_output( lo_wrapped_xml ).
 
   ENDMETHOD.
 
 
-  METHOD WRAP_XML_INPUT.
+  METHOD wrap_xml_input.
     CREATE OBJECT ro_xml_proxy TYPE lcl_xml_input
       EXPORTING
         io_xml = io_xml.
   ENDMETHOD.
 
 
-  METHOD WRAP_XML_OUTPUT.
+  METHOD wrap_xml_output.
     CREATE OBJECT ro_xml_proxy TYPE lcl_xml_output
       EXPORTING
         io_xml = io_xml.

@@ -15,7 +15,7 @@ INTERFACE zif_abapgitp_xml_output
   METHODS render
     IMPORTING
       !iv_normalize TYPE sap_bool DEFAULT abap_true
-      !is_metadata  TYPE zcl_abapgitp_object=>ty_metadata
+      !is_metadata  TYPE zif_abapgit_definitions=>ty_metadata
     RETURNING
       VALUE(rv_xml) TYPE string .
   METHODS get_wrapped_xml
