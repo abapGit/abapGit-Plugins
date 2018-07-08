@@ -1,4 +1,4 @@
-[![abaplint](http://abaplint.org/badges/larshp/abapGit-Plugins)](http://abaplint.org/project/larshp/abapGit-Plugins)
+[![abaplint](https://abaplint.org/badges/larshp/abapGit-Plugins)](http://abaplint.org/project/larshp/abapGit-Plugins)
 
 # abapGit-Plugins
 This repository contains plugins for abapGit to support other objecttypes. 
