@@ -1,5 +1,7 @@
 [![abaplint](https://abaplint.org/badges/larshp/abapGit-Plugins)](http://abaplint.org/project/larshp/abapGit-Plugins)
 
+These plugins will sometime become obsolete, see https://github.com/larshp/abapGit/issues/1449 and https://github.com/larshp/abapGit/pull/1590
+
 # abapGit-Plugins
 This repository contains plugins for abapGit to support other objecttypes. 
 By inheriting from `zcl_abapgit_object`and implementing `zif_abapgit_plugin` you can create plugins for objecttypes which are not natively supported by ABAPGit yet.
