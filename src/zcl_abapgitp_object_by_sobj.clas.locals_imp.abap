@@ -225,8 +225,15 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
     FIELD-SYMBOLS <ls_imported_table_content> LIKE LINE OF lt_imported_table_content.
     DATA lv_structures_identical TYPE abap_bool.
     LOOP AT lt_imported_table_content  ASSIGNING <ls_imported_table_content>.
-      ASSIGN <ls_imported_table_content>-data_tab->* TO <lt_imported_data>.
-      IF lines( <lt_imported_data> ) = 0.
+      IF NOT <ls_imported_table_content>-data_tab IS INITIAL.
+        ASSIGN <ls_imported_table_content>-data_tab->* TO <lt_imported_data>.
+      ELSE.
+        IF <lt_imported_data> IS ASSIGNED.
+          UNASSIGN <lt_imported_data>.
+        ENDIF.
+      ENDIF.
+      IF NOT <lt_imported_data> IS ASSIGNED
+        OR lines( <lt_imported_data> ) = 0.
         CONTINUE. "Performance improvement
       ENDIF.
       READ TABLE mt_object_table ASSIGNING <ls_local_object_table>
