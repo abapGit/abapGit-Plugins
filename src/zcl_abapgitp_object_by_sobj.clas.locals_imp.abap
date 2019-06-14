@@ -539,7 +539,8 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
 
       SELECT * FROM (<ls_object_table>-tobj_name)
         INTO TABLE <lt_data>
-        WHERE (lv_where_on_keys).
+        WHERE (lv_where_on_keys)
+        ORDER BY PRIMARY KEY.
 
 *      two consumers: exporting the object to the container and providing all table-content to a container
       IF io_object_container IS NOT INITIAL.
