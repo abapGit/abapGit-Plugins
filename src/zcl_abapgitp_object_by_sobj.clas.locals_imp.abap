@@ -749,9 +749,9 @@ CLASS lcx_obj_exception IMPLEMENTATION.
     mv_text = iv_text.
   ENDMETHOD.
 
-  METHOD get_error_text.
+  METHOD get_text.
 * todo, perhaps remove mv_text attribute?
-    rv_text = mv_text.
+    result = mv_text.
   ENDMETHOD.
 
 ENDCLASS.
