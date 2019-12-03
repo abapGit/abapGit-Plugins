@@ -6,7 +6,7 @@ CLASS lcx_obj_exception DEFINITION INHERITING FROM cx_static_check.
         previous LIKE previous OPTIONAL
         iv_text  TYPE string OPTIONAL.
 
-    METHODS: get_error_text RETURNING VALUE(rv_text) TYPE string.
+    METHODS: get_text REDEFINITION.
 
   PROTECTED SECTION.
     DATA mv_text TYPE string.

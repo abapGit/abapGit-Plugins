@@ -98,7 +98,7 @@ CLASS ZCL_ABAPGITP_OBJECT_BY_SOBJ IMPLEMENTATION.
         RAISE EXCEPTION TYPE zcx_abapgitp_object
           EXPORTING
             text     = |{ mv_obj_type } { mv_obj_name }: {
-                        lx_obj_exception->get_error_text( ) }|
+                        lx_obj_exception->get_text( ) }|
             previous = lx_obj_exception.
     ENDTRY.
 
