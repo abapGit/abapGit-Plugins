@@ -4,7 +4,7 @@ These plugins will sometime become obsolete, see https://github.com/larshp/abapG
 
 # abapGit-Plugins
 This repository contains plugins for abapGit to support other objecttypes. 
-By inheriting from `zcl_abapgit_object`and implementing `zif_abapgit_plugin` you can create plugins for objecttypes which are not natively supported by ABAPGit yet.
+By inheriting from `zcl_abapgitp_object`and implementing `zif_abapgitp_plugin` you can create plugins for objecttypes which are not natively supported by ABAPGit yet.
 However, please be aware that the format used by ABAPGit may change, so please check back frequently to make sure your plugin stays up-to-date.
 
 # SOBJ-based generic plugin
