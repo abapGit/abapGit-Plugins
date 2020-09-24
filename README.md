@@ -1,5 +1,3 @@
-[![abaplint](https://app.abaplint.org/badges/larshp/abapGit-Plugins)](https://app.abaplint.org/project/larshp/abapGit-Plugins)
-
 These plugins will sometime become obsolete, see https://github.com/larshp/abapGit/issues/1449 and https://github.com/larshp/abapGit/pull/1590
 
 # abapGit-Plugins
