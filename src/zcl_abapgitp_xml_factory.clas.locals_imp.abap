@@ -17,20 +17,20 @@ CLASS lcl_xml_output IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD zif_abapgitp_xml_output~add.
-    CALL METHOD mo_wrapped_xml->('ADD')
+    CALL METHOD mo_wrapped_xml->('ZIF_ABAPGIT_XML_OUTPUT~ADD')
       EXPORTING
         iv_name = iv_name
         ig_data = ig_data.
   ENDMETHOD.
 
   METHOD zif_abapgitp_xml_output~set_raw.
-    CALL METHOD mo_wrapped_xml->('SET_RAW')
+    CALL METHOD mo_wrapped_xml->('ZIF_ABAPGIT_XML_OUTPUT~SET_RAW')
       EXPORTING
         ii_raw = ii_raw.
   ENDMETHOD.
 
   METHOD zif_abapgitp_xml_output~render.
-    CALL METHOD mo_wrapped_xml->('RENDER')
+    CALL METHOD mo_wrapped_xml->('ZIF_ABAPGIT_XML_OUTPUT~RENDER')
       EXPORTING
         iv_normalize = iv_normalize
         is_metadata  = is_metadata
@@ -62,7 +62,7 @@ CLASS lcl_xml_input IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD zif_abapgitp_xml_input~read.
-    CALL METHOD mo_wrapped_xml->('READ')
+    CALL METHOD mo_wrapped_xml->('ZIF_ABAPGIT_XML_INPUT~READ')
       EXPORTING
         iv_name = iv_name
       CHANGING
@@ -70,7 +70,7 @@ CLASS lcl_xml_input IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD zif_abapgitp_xml_input~get_raw.
-    CALL METHOD mo_wrapped_xml->('GET_RAW')
+    CALL METHOD mo_wrapped_xml->('ZIF_ABAPGIT_XML_INPUT~GET_RAW')
       RECEIVING
         ri_raw = ri_raw.
   ENDMETHOD.
