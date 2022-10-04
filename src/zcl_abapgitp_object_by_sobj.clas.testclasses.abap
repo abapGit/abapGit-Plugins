@@ -2055,16 +2055,3 @@ CLASS ltcl_sdpk IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
-    CREATE OBJECT mo_bridge
-      EXPORTING
-        iv_object      = 'SDPK'
-        iv_object_name = 'ZOBJUT_TES1234'.
-
-    cl_abap_unit_assert=>assert_equals(
-       msg = 'Where clause not expected'
-       exp = |MANDT = '{ sy-mandt }' AND AKTKEY = 'ZOBJUT_TES' AND AKCNT = '1234'|
-       act = mo_bridge->expose_where_clause( '/SAPAPO/TSPLBAKT' ) ).
-
-  ENDMETHOD.
-
-ENDCLASS.
