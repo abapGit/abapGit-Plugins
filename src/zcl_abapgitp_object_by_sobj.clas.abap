@@ -109,7 +109,7 @@ CLASS ZCL_ABAPGITP_OBJECT_BY_SOBJ IMPLEMENTATION.
   METHOD zif_abapgitp_plugin~exists.
     TRY.
         rv_bool = get_tlogo_bridge( )->instance_exists( ).
-      CATCH lcx_obj_exception.
+      CATCH lcx_obj_exception zcx_abapgitp_object.
         rv_bool = abap_false.
     ENDTRY.
   ENDMETHOD.

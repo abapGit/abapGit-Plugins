@@ -3,6 +3,7 @@ CLASS lcl_catalog IMPLEMENTATION.
   METHOD build.
 
 *  field catalog of table structures in current system
+    DATA lo_typedescr TYPE REF TO cl_abap_typedescr.
     DATA lo_structdescr     TYPE REF TO cl_abap_structdescr.
     DATA lt_included_view   TYPE cl_abap_structdescr=>included_view.
     DATA ls_component       LIKE LINE OF lt_included_view.
@@ -12,12 +13,21 @@ CLASS lcl_catalog IMPLEMENTATION.
     FIELD-SYMBOLS <ls_dfies> LIKE LINE OF lt_dfies.
 
 
-    lo_structdescr ?= cl_abap_structdescr=>describe_by_name( iv_tobj_name ).
+    cl_abap_structdescr=>describe_by_name(
+      EXPORTING
+        p_name         = iv_tobj_name
+      RECEIVING
+        p_descr_ref    = lo_typedescr
+      EXCEPTIONS
+        type_not_found = 1
+        OTHERS         = 2 ).
     IF sy-subrc <> 0.
       RAISE EXCEPTION TYPE lcx_obj_exception
         EXPORTING
           iv_text = |Structure of { iv_tobj_name } corrupt|.
     ENDIF.
+
+    lo_structdescr ?= lo_typedescr.
 
     DATA lv_tabname_ddobj TYPE ddobjname.
     lv_tabname_ddobj = iv_tobj_name.
