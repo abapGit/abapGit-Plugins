@@ -1991,3 +1991,57 @@ CLASS ltcl_bobf IMPLEMENTATION.
   ENDMETHOD.
 
 ENDCLASS.
+
+
+" R3TR  SDPK  APO: Activities for Mass Processing Jobs
+"
+" Table /SAPAPO/TSPLBAKT
+" Keys:
+" MANDT  MANDT CLNT  3 0 0 Client
+" AKTKEY  /SAPAPO/AKTKEY  CHAR  10  0 0 Planning Activity Key
+" AKCNT /SAPAPO/AKCNT INT4  10  0 0 Activity Sequence
+CLASS ltcl_SDPK DEFINITION FINAL FOR TESTING
+  DURATION SHORT
+  RISK LEVEL HARMLESS.
+
+  PRIVATE SECTION.
+    METHODS:
+      where_clause_trunc_non_int FOR TESTING RAISING cx_static_check,
+      where_clause_with_int FOR TESTING RAISING cx_static_check.
+
+    DATA mo_bridge TYPE REF TO lcl_test_bridge.
+ENDCLASS.
+
+
+CLASS ltcl_SDPK IMPLEMENTATION.
+
+  METHOD where_clause_trunc_non_int.
+
+    CREATE OBJECT mo_bridge
+      EXPORTING
+        iv_object      = 'SDPK'
+        iv_object_name = 'ZOBJUT_TEST_DUMMY'.
+
+    cl_abap_unit_assert=>assert_equals(
+       msg = 'Where clause not expected'
+       exp = |MANDT = '{ sy-mandt }' AND AKTKEY = 'ZOBJUT_TES'|
+       act = mo_bridge->expose_where_clause( '/SAPAPO/TSPLBAKT' ) ).
+
+  ENDMETHOD.
+
+
+  METHOD where_clause_with_int.
+
+    CREATE OBJECT mo_bridge
+      EXPORTING
+        iv_object      = 'SDPK'
+        iv_object_name = 'ZOBJUT_TES1234'.
+
+    cl_abap_unit_assert=>assert_equals(
+       msg = 'Where clause not expected'
+       exp = |MANDT = '{ sy-mandt }' AND AKTKEY = 'ZOBJUT_TES' AND AKCNT = '1234'|
+       act = mo_bridge->expose_where_clause( '/SAPAPO/TSPLBAKT' ) ).
+
+  ENDMETHOD.
+
+ENDCLASS.

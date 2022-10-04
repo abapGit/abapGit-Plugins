@@ -735,6 +735,12 @@ CLASS lcl_tlogo_bridge IMPLEMENTATION.
       ls_objkey_sub-value = |{ substring( val = cs_objkey-value off = lv_objkey_sub_pos len = lv_len ) }|.
       ls_objkey_sub-num = cv_non_value_pos.
 
+      IF  ls_key_component_uncovered-type_kind = cl_abap_typedescr=>typekind_int
+      AND condense( ls_objkey_sub-value ) CN '0123456789'.
+        " Avoid CONVT_NO_NUMBER dump for tables with INT-keys
+        CONTINUE.
+      ENDIF.
+
       INSERT ls_objkey_sub INTO TABLE ct_objkey.
 
       ADD ls_key_component_uncovered-length TO lv_objkey_sub_pos.
