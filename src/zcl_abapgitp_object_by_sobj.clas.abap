@@ -25,7 +25,7 @@ ENDCLASS.
 
 
 
-CLASS ZCL_ABAPGITP_OBJECT_BY_SOBJ IMPLEMENTATION.
+CLASS zcl_abapgitp_object_by_sobj IMPLEMENTATION.
 
 
   METHOD class_constructor.
@@ -48,6 +48,10 @@ CLASS ZCL_ABAPGITP_OBJECT_BY_SOBJ IMPLEMENTATION.
         INSERT lv_obj_type INTO TABLE gt_supported_obj_types.
       ENDIF.
     ENDLOOP.
+
+    " WDCL is not supported since it has two '*' in OBJSL-TOBJKEY
+    DELETE gt_supported_obj_types WHERE table_line = 'WDCL'.
+
   ENDMETHOD.
 
 
