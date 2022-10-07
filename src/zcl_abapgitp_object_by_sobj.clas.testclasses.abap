@@ -2000,7 +2000,7 @@ ENDCLASS.
 " MANDT  MANDT CLNT  3 0 0 Client
 " AKTKEY  /SAPAPO/AKTKEY  CHAR  10  0 0 Planning Activity Key
 " AKCNT /SAPAPO/AKCNT INT4  10  0 0 Activity Sequence
-CLASS ltcl_SDPK DEFINITION FINAL FOR TESTING
+CLASS ltcl_sdpk DEFINITION FINAL FOR TESTING
   DURATION SHORT
   RISK LEVEL HARMLESS.
 
@@ -2013,14 +2013,19 @@ CLASS ltcl_SDPK DEFINITION FINAL FOR TESTING
 ENDCLASS.
 
 
-CLASS ltcl_SDPK IMPLEMENTATION.
+CLASS ltcl_sdpk IMPLEMENTATION.
 
   METHOD where_clause_trunc_non_int.
 
-    CREATE OBJECT mo_bridge
-      EXPORTING
-        iv_object      = 'SDPK'
-        iv_object_name = 'ZOBJUT_TEST_DUMMY'.
+    TRY.
+        CREATE OBJECT mo_bridge
+          EXPORTING
+            iv_object      = 'SDPK'
+            iv_object_name = 'ZOBJUT_TEST_DUMMY'.
+
+      CATCH lcx_obj_exception.
+        RETURN. " SDPK doesn't exist. Skip.
+    ENDTRY.
 
     cl_abap_unit_assert=>assert_equals(
        msg = 'Where clause not expected'
@@ -2032,10 +2037,15 @@ CLASS ltcl_SDPK IMPLEMENTATION.
 
   METHOD where_clause_with_int.
 
-    CREATE OBJECT mo_bridge
-      EXPORTING
-        iv_object      = 'SDPK'
-        iv_object_name = 'ZOBJUT_TES1234'.
+    TRY.
+        CREATE OBJECT mo_bridge
+          EXPORTING
+            iv_object      = 'SDPK'
+            iv_object_name = 'ZOBJUT_TES1234'.
+
+      CATCH lcx_obj_exception.
+        RETURN. " SDPK doesn't exist. Skip.
+    ENDTRY.
 
     cl_abap_unit_assert=>assert_equals(
        msg = 'Where clause not expected'
